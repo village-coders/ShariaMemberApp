@@ -59,6 +59,16 @@ export default function SignatureSetup() {
     setIsEmpty(true);
   };
 
+  // Pure JS: convert a data: URL string to a Blob without using fetch()
+  const dataURLtoBlob = (dataUrl) => {
+    const [header, base64] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(base64);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+    return new Blob([array], { type: mime });
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (sigCanvas.current.isEmpty()) {
@@ -67,23 +77,24 @@ export default function SignatureSetup() {
     }
     setLoading(true);
     try {
-      const dataUrl = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
+      const dataUrl = sigCanvas.current.toDataURL('image/png');
+      const blob = dataURLtoBlob(dataUrl);
       const file = new File([blob], 'signature.png', { type: 'image/png' });
 
       const formData = new FormData();
       formData.append('name', name);
-      formData.append('username', user.email);
-      formData.append('user_id', user.id || user._id);
+      formData.append('username', user.email || user.username || '');
+      formData.append('user_id', user.id || user._id || '');
       formData.append('signature_file', file);
 
-      const savedSig = await createSignature(formData);
+      const response = await createSignature(formData);
+      // API may return { data: {...} } or the object directly
+      const savedSig = response?.data || response;
       localStorage.setItem('my_signature', JSON.stringify(savedSig));
       setExistingSig(savedSig);
       setRedrawMode(false);
     } catch (err) {
-      alert(err.message);
+      alert(err.message || 'Failed to save signature. Please try again.');
     } finally {
       setLoading(false);
     }
