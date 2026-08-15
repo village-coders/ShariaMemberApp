@@ -372,42 +372,19 @@ export default function ProductDetail() {
 
   return (
     <>
-      {/* Mobile App Header */}
-      <div style={{
-        background: 'var(--primary)',
-        padding: '12px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        position: 'sticky',
-        top: 0,
-        zIndex: 50
-      }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            background: 'rgba(255,255,255,0.15)',
-            border: 'none',
-            color: 'white',
-            cursor: 'pointer',
-            borderRadius: 8,
-            padding: '7px 10px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 14,
-            fontWeight: 500
-          }}
-        >
-          <ArrowLeft size={16} /> Back
-        </button>
-
-        <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          Product #{sn} Detail
-        </span>
-      </div>
-
       <div className="app-content" style={{ paddingBottom: 100 }}>
+
+        {/* Back + title row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{ background: 'var(--primary-subtle)', border: 'none', color: 'var(--primary)', cursor: 'pointer', borderRadius: 10, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}
+          >
+            <ArrowLeft size={15} /> Back
+          </button>
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Product #{sn} Detail</span>
+        </div>
+
         {/* Product Hero Card */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
