@@ -7,6 +7,7 @@ import DashboardLayout from './routes/DashboardLayout';
 import NewLogsheets from './routes/NewLogsheets';
 import ManageLogsheets from './routes/ManageLogsheets';
 import LogsheetDetail from './routes/LogsheetDetail';
+import ProductDetail from './routes/ProductDetail';
 import SignatureSetup from './routes/SignatureSetup';
 
 const router = createBrowserRouter([
@@ -29,6 +30,14 @@ const router = createBrowserRouter([
   {
     path: '/logsheet/:id',
     element: <ProtectedRoute><LogsheetDetail /></ProtectedRoute>
+  },
+  {
+    path: '/logsheet/:id/product/:prodIdx',
+    element: <ProtectedRoute><ProductDetail /></ProtectedRoute>
+  },
+  {
+    path: '/addon/:id/product/:prodIdx',
+    element: <ProtectedRoute><ProductDetail /></ProtectedRoute>
   }
 ]);
 

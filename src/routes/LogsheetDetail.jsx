@@ -1,8 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
-import { signLogsheet, getApplicationById, getAddOnById } from '../api/logsheets';
-import { ArrowLeft, PenLine, CheckCircle, User, Calendar, FileText, Clipboard, Package, ShieldAlert, Check } from 'lucide-react';
+import { getLogsheetById, getApplicationById, getAddOnById, signLogsheet } from '../api/logsheets';
+import { API_BASE, getFileUrl } from '../api/client';
+import {
+  ArrowLeft,
+  PenLine,
+  CheckCircle,
+  Calendar,
+  FileText,
+  Package,
+  ChevronRight,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  Layers
+} from 'lucide-react';
 import LoadingState from '../components/LoadingState';
 
 const ROLES = [
@@ -12,7 +25,7 @@ const ROLES = [
   { value: 'ceo',     label: 'CEO' },
 ];
 
-function SigStatus({ name, date }) {
+function SigStatus({ name }) {
   return name ? (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
       <CheckCircle size={13} color="var(--status-done-text)" />
@@ -27,46 +40,112 @@ export default function LogsheetDetail() {
   const { id } = useParams();
   const { state } = useLocation();
   const navigate = useNavigate();
-  const logsheet = state?.logsheet;
+
+  const [logsheet, setLogsheet] = useState(state?.logsheet || null);
+  const [loadingLogsheet, setLoadingLogsheet] = useState(!state?.logsheet);
+  const [appDetails, setAppDetails] = useState(state?.app || null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const [showSignModal, setShowSignModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState('mufti');
   const [submitting, setSubmitting] = useState(false);
   const [mySig, setMySig] = useState(null);
 
-  const [appDetails, setAppDetails] = useState(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-
   useEffect(() => {
     const stored = localStorage.getItem('my_signature');
-    if (stored) setMySig(JSON.parse(stored));
+    if (stored) {
+      try {
+        setMySig(JSON.parse(stored));
+      } catch (e) {}
+    }
   }, []);
 
+  // 1. Fetch Logsheet if not in state
+  useEffect(() => {
+    if (!logsheet && id) {
+      setLoadingLogsheet(true);
+      getLogsheetById(id)
+        .then(res => {
+          const ls = res.data || res;
+          setLogsheet(ls);
+        })
+        .catch(err => console.error('Failed to load logsheet', err))
+        .finally(() => setLoadingLogsheet(false));
+    }
+  }, [id, logsheet]);
+
+  // 2. Fetch associated Application or AddOn Application details
   useEffect(() => {
     if (!logsheet) return;
-    const appId = logsheet.application_id?._id || logsheet.application_id;
-    const addonId = logsheet.addon_application_id?._id || logsheet.addon_application_id;
 
-    if (logsheet.source_type === 'addon_application' && addonId) {
+    const addonObj = logsheet.addon_application_id;
+    const addonId = typeof addonObj === 'object' && addonObj?._id ? addonObj._id : addonObj;
+
+    const appObj = logsheet.application_id;
+    const appId = typeof appObj === 'object' && appObj?._id ? appObj._id : appObj;
+
+    const token = localStorage.getItem('token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const tryFallbackAddon = () => {
+      fetch(`${API_BASE}/add-on-applications`, { headers })
+        .then(r => r.json())
+        .then(res => {
+          const list = res.data || (Array.isArray(res) ? res : []);
+          const clientId = logsheet.client_id?._id || logsheet.client_id?.id || logsheet.client_id;
+          const companyName = (logsheet.company_name || '').toLowerCase().trim();
+
+          const match = list.find(a => {
+            const aClientId = a.client_id?._id || a.client_id?.id || a.client_id;
+            const aCompany = (a.client_id?.company_name || a.company_name || '').toLowerCase().trim();
+            return (clientId && aClientId === clientId) || (companyName && aCompany && aCompany === companyName);
+          });
+
+          if (match) {
+            setAppDetails(match);
+          }
+        })
+        .catch(console.error);
+    };
+
+    if (addonId) {
       setLoadingDetails(true);
       getAddOnById(addonId)
-        .then(res => setAppDetails(res.data || res))
-        .catch(err => console.error('Failed to load add-on application details', err))
+        .then(res => {
+          const data = res.data || res;
+          if (data && (data._id || data.products || data.product_approval_form)) {
+            setAppDetails(data);
+          } else {
+            tryFallbackAddon();
+          }
+        })
+        .catch(() => tryFallbackAddon())
         .finally(() => setLoadingDetails(false));
     } else if (appId) {
       setLoadingDetails(true);
       getApplicationById(appId)
-        .then(res => setAppDetails(res.data || res))
-        .catch(err => console.error('Failed to load application details', err))
+        .then(res => {
+          const data = res.data || res;
+          if (data && (data._id || (data.products && data.products.length > 0))) {
+            setAppDetails(data);
+          } else {
+            tryFallbackAddon();
+          }
+        })
+        .catch(() => tryFallbackAddon())
         .finally(() => setLoadingDetails(false));
+    } else {
+      tryFallbackAddon();
     }
   }, [logsheet]);
+
+  if (loadingLogsheet) return <LoadingState />;
 
   if (!logsheet) {
     return (
       <div style={{ padding: 16 }}>
         <button className="btn btn-secondary" onClick={() => navigate(-1)} style={{ width: 'auto', padding: '10px 18px' }}>
-          Go Back
+          <ArrowLeft size={16} /> Go Back
         </button>
         <p style={{ marginTop: 16, color: 'var(--text-3)' }}>Logsheet not found.</p>
       </div>
@@ -74,7 +153,7 @@ export default function LogsheetDetail() {
   }
 
   const isCompleted = logsheet.status?.includes('Waiting For Certificate') || logsheet.status?.includes('Completed');
-  const totalSigned = [logsheet.mufti_sign_name, logsheet.mufti2_sign_name, logsheet.manager_sign_name, logsheet.ceo_sign_name].filter(Boolean).length;
+  const totalSigned = [logsheet.mufti_signature, logsheet.mufti2_signature, logsheet.manager_signature, logsheet.ceo_signature].filter(Boolean).length;
 
   const handleSign = async () => {
     if (!mySig?.signature_url) {
@@ -87,33 +166,76 @@ export default function LogsheetDetail() {
       alert('Logsheet signed successfully!');
       navigate(-1);
     } catch (err) {
-      alert(err.message);
+      alert(err.message || 'Failed to sign logsheet');
     } finally {
       setSubmitting(false);
       setShowSignModal(false);
     }
   };
 
+  // Extract products from all potential places
+  const rawAddonProducts = Array.isArray(appDetails?.products) && appDetails.products.length > 0 ? appDetails.products : [];
+  const certProducts = Array.isArray(appDetails?.certificate_id?.products_covered)
+    ? appDetails.certificate_id.products_covered.map(p => typeof p === 'string' ? { name: p, isExisting: true } : p)
+    : [];
+  const legacyProduct = appDetails?.new_product_name ? [{ name: appDetails.new_product_name, type: 'Add product', isNew: true }] : [];
+
+  const formResponses = Array.isArray(appDetails?.product_approval_form?.product_responses)
+    ? appDetails.product_approval_form.product_responses
+    : (Array.isArray(logsheet?.product_approval_form?.product_responses) ? logsheet.product_approval_form.product_responses : []);
+
+  let allProductItems = rawAddonProducts.length > 0 ? rawAddonProducts : [...legacyProduct, ...certProducts];
+
+  // If no explicit product array exists but client submitted product responses, construct products list
+  if (allProductItems.length === 0 && formResponses.length > 0) {
+    allProductItems = formResponses.map((r, i) => ({
+      name: r.product_name || `Product #${r.product_index !== undefined ? r.product_index + 1 : i + 1}`,
+      code: r.form_data?.code || r.form_data?.product_code,
+      type: 'Add-on Product',
+      response: r
+    }));
+  }
+
+  // If still empty, check if logsheet has product_category containing products (e.g. "Sugar, Salt, Sweet, Maggi")
+  if (allProductItems.length === 0 && logsheet?.product_category && logsheet.product_category.includes(',')) {
+    const parsedNames = logsheet.product_category.split(',').map(s => s.trim()).filter(Boolean);
+    if (parsedNames.length > 0) {
+      allProductItems = parsedNames.map((name, i) => ({
+        name,
+        type: 'Product',
+        sn: i + 1
+      }));
+    }
+  }
+
+  const isAddon = logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(appDetails?.action_type);
+
   return (
     <>
+      {/* Sticky Header */}
       <div style={{ background: 'var(--primary)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 50 }}>
         <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', cursor: 'pointer', borderRadius: 8, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 500 }}>
           <ArrowLeft size={16} /> Back
         </button>
-        <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: 600 }}>Logsheet Detail</span>
+        <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 600 }}>Logsheet Detail</span>
       </div>
 
       <div className="app-content" style={{ paddingBottom: 100 }}>
-        {/* Hero */}
+        {/* Hero Card */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>{logsheet.company_name}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{logsheet.audit_type}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
+                {logsheet.company_name || appDetails?.client_id?.company_name || 'Applicant Company'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                {logsheet.audit_type || (isAddon ? 'Add-on Application' : 'Halal Audit')}
+              </div>
             </div>
             <StatusBadge status={logsheet.status} />
           </div>
-          {/* Signature progress */}
+
+          {/* Signature Progress */}
           <div style={{ marginTop: 12, background: 'var(--primary-subtle)', borderRadius: 10, padding: '10px 12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>Committee Signatures</span>
@@ -125,7 +247,7 @@ export default function LogsheetDetail() {
           </div>
         </div>
 
-        {/* Audit Info */}
+        {/* Assessment Card */}
         <p className="section-heading">Logsheet Assessment</p>
         <div className="card" style={{ padding: '4px 16px' }}>
           {[
@@ -145,128 +267,133 @@ export default function LogsheetDetail() {
           ))}
         </div>
 
-        {/* Dynamic Context Details & Products */}
-        {loadingDetails && <LoadingState />}
+        {/* Assigned Products & Approval Form Section */}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <p className="section-heading" style={{ margin: 0 }}>
+              Assigned Products & Approval Forms ({allProductItems.length})
+            </p>
+          </div>
+
+          {loadingDetails && <LoadingState />}
+
+          {!loadingDetails && allProductItems.length === 0 && (
+            <div className="card" style={{ padding: 16, textAlign: 'center' }}>
+              <Package size={22} color="var(--text-3)" style={{ marginBottom: 4 }} />
+              <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
+                No products found for this logsheet.
+              </p>
+            </div>
+          )}
+
+          {allProductItems.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {allProductItems.map((prod, idx) => {
+                const prodName = typeof prod === 'string' ? prod : (prod.name || 'Unnamed Product');
+                const prodType = prod.type || (prod.isExisting ? 'Existing Covered' : (prod.isNew ? 'New Product' : null));
+                const prodCode = prod.code;
+                const sn = prod.sn || (idx + 1);
+
+                // Find corresponding filled response
+                const hasResp = formResponses.find(r => r.product_index === idx || (prodName && r.product_name?.toLowerCase() === prodName?.toLowerCase()));
+
+                return (
+                  <div
+                    key={idx}
+                    className="card"
+                    onClick={() => navigate(`/logsheet/${logsheet._id || logsheet.id}/product/${idx}`, {
+                      state: { app: appDetails, logsheet, product: prod, index: idx }
+                    })}
+                    style={{
+                      padding: '14px 16px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      border: hasResp ? '1.5px solid var(--primary-border)' : '1px solid var(--border)',
+                      boxShadow: 'var(--shadow-xs)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Package size={20} color="var(--primary)" />
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {sn}. {prodName}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                          {prodCode && (
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg)', padding: '1px 6px', borderRadius: 4 }}>
+                              Code: {prodCode}
+                            </span>
+                          )}
+                          {prodType && (
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-subtle)', padding: '1px 6px', borderRadius: 4 }}>
+                              {prodType}
+                            </span>
+                          )}
+                          {hasResp ? (
+                            <span style={{ fontSize: 11, color: 'var(--status-done-text)', background: 'var(--status-done-bg)', padding: '1px 6px', borderRadius: 4, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <CheckCircle2 size={11} /> Filled Form
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                              Tap to view
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>View Form</span>
+                      <ChevronRight size={18} color="var(--primary)" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Context Information */}
         {!loadingDetails && appDetails && (
-          <>
-            {logsheet.source_type === 'addon_application' ? (
-              <>
-                <p className="section-heading" style={{ marginTop: 16 }}>Add-on Details</p>
-                <div className="card" style={{ padding: '4px 16px' }}>
-                  {[
-                    { label: 'Contact Person', value: appDetails.contact_name || '—' },
-                    { label: 'Contact Email', value: appDetails.contact_email || '—' },
-                    { label: 'Contact Phone', value: appDetails.contact_phone || '—' },
-                    { label: 'Action Type', value: appDetails.action_type?.toUpperCase() || '—' },
-                    { label: 'Client Message', value: appDetails.message || '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="detail-row">
-                      <div className="detail-label">{label}</div>
-                      <div className="detail-value">{value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="section-heading" style={{ marginTop: 16 }}>Add-on Products</p>
-                {appDetails.products && appDetails.products.length > 0 ? (
-                  appDetails.products.map((prod, idx) => (
-                    <div key={idx} className="card" style={{ padding: '12px 14px', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Package size={15} color="var(--primary)" />
-                        <span style={{ fontSize: 14, fontWeight: 600 }}>{prod.name}</span>
-                        {prod.code && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>({prod.code})</span>}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
-                        Action: <strong style={{ color: 'var(--primary)' }}>{prod.type}</strong>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="card" style={{ padding: 12, textAlign: 'center', color: 'var(--text-3)' }}>
-                    No products specified in add-on.
+          <div style={{ marginTop: 14 }}>
+            <p className="section-heading">
+              {isAddon ? 'Add-on Details' : 'Application Details'}
+            </p>
+            <div className="card" style={{ padding: '4px 16px' }}>
+              {isAddon ? (
+                [
+                  { label: 'Contact Person', value: appDetails.contact_name || '—' },
+                  { label: 'Contact Email', value: appDetails.contact_email || '—' },
+                  { label: 'Contact Phone', value: appDetails.contact_phone || '—' },
+                  { label: 'Action Type', value: appDetails.action_type?.toUpperCase() || '—' },
+                  { label: 'Client Message', value: appDetails.message || '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="detail-row">
+                    <div className="detail-label">{label}</div>
+                    <div className="detail-value">{value}</div>
                   </div>
-                )}
-
-                {/* Product Approval Form Details */}
-                {appDetails.product_approval_form && (
-                  <>
-                    <p className="section-heading" style={{ marginTop: 16 }}>Product Approval Form</p>
-                    <div className="card">
-                      {appDetails.product_approval_form.form_text && (
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>FORM INSTRUCTIONS</div>
-                          <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4, whiteSpace: 'pre-wrap' }}>
-                            {appDetails.product_approval_form.form_text}
-                          </div>
-                        </div>
-                      )}
-
-                      {appDetails.product_approval_form.product_responses && appDetails.product_approval_form.product_responses.length > 0 && (
-                        <div style={{ marginTop: 12 }}>
-                          <div style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600, marginBottom: 8 }}>PRODUCT RESPONSES</div>
-                          {appDetails.product_approval_form.product_responses.map((resp, idx) => (
-                            <div key={idx} style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, marginBottom: 8, background: 'var(--surface-raised)' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: 13, fontWeight: 600 }}>{resp.product_name || `Product #${resp.product_index}`}</span>
-                                {resp.is_saved && <span style={{ fontSize: 11, color: 'var(--status-done-text)', background: 'var(--status-done-bg)', padding: '2px 6px', borderRadius: 4 }}>Saved</span>}
-                              </div>
-                              {resp.response_text && (
-                                <p style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>
-                                  Response: <em>{resp.response_text}</em>
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="section-heading" style={{ marginTop: 16 }}>Application Details</p>
-                <div className="card" style={{ padding: '4px 16px' }}>
-                  {[
-                    { label: 'Application No.', value: appDetails.application_number || '—' },
-                    { label: 'Type', value: appDetails.application_type || '—' },
-                    { label: 'Category', value: appDetails.category || '—' },
-                    { label: 'Establishment Name', value: appDetails.establishment_name || '—' },
-                    { label: 'Establishment Address', value: appDetails.establishment_address || '—' },
-                    { label: 'Scope', value: appDetails.scope || '—' },
-                    { label: 'Employee Count', value: appDetails.employee_count || '—' },
-                    { label: 'Has Porcine?', value: appDetails.has_porcine ? 'Yes' : 'No' },
-                    { label: 'Has Intoxicants?', value: appDetails.has_intoxicants ? 'Yes' : 'No' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="detail-row">
-                      <div className="detail-label">{label}</div>
-                      <div className="detail-value">{value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="section-heading" style={{ marginTop: 16 }}>Products Covered</p>
-                {appDetails.products && appDetails.products.length > 0 ? (
-                  appDetails.products.map((prod, idx) => (
-                    <div key={idx} className="card" style={{ padding: '12px 14px', marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Package size={15} color="var(--primary)" />
-                        <span style={{ fontSize: 14, fontWeight: 600 }}>{prod.name}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>
-                        <span>Brand: <strong>{prod.brand || '—'}</strong></span>
-                        <span>Category: <strong>{prod.category || '—'}</strong></span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="card" style={{ padding: 12, textAlign: 'center', color: 'var(--text-3)' }}>
-                    No products listed.
+                ))
+              ) : (
+                [
+                  { label: 'Application No.', value: appDetails.application_number || '—' },
+                  { label: 'Type', value: appDetails.application_type || '—' },
+                  { label: 'Category', value: appDetails.category || '—' },
+                  { label: 'Establishment Name', value: appDetails.establishment_name || '—' },
+                  { label: 'Scope', value: appDetails.scope || '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="detail-row">
+                    <div className="detail-label">{label}</div>
+                    <div className="detail-value">{value}</div>
                   </div>
-                )}
-              </>
-            )}
-          </>
+                ))
+              )}
+            </div>
+          </div>
         )}
 
         {/* Signature Status */}

@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 
 export const getLogsheets = () => apiClient('/application-logsheets');
-export const getLogsheetById = (id) => apiClient(`/application-logsheets/${id}`);
+export const getLogsheetById = (id) => apiClient(`/application-logsheets/application/${id}`);
 export const signLogsheet = (id, role, signature_url, signature_name, comment) => apiClient(`/application-logsheets/${id}/sign`, {
   method: 'PUT',
   body: JSON.stringify({ role, signature_url, signature_name, comment })
