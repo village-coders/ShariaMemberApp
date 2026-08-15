@@ -16,28 +16,16 @@ const router = createBrowserRouter([
     element: <Login />
   },
   {
-    path: '/setup-signature',
-    element: <ProtectedRoute><SignatureSetup /></ProtectedRoute>
-  },
-  {
     path: '/',
     element: <ProtectedRoute><DashboardLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <NewLogsheets /> },
-      { path: 'manage', element: <ManageLogsheets /> }
+      { path: 'manage', element: <ManageLogsheets /> },
+      { path: 'setup-signature', element: <SignatureSetup /> },
+      { path: 'logsheet/:id', element: <LogsheetDetail /> },
+      { path: 'logsheet/:id/product/:prodIdx', element: <ProductDetail /> },
+      { path: 'addon/:id/product/:prodIdx', element: <ProductDetail /> }
     ]
-  },
-  {
-    path: '/logsheet/:id',
-    element: <ProtectedRoute><LogsheetDetail /></ProtectedRoute>
-  },
-  {
-    path: '/logsheet/:id/product/:prodIdx',
-    element: <ProtectedRoute><ProductDetail /></ProtectedRoute>
-  },
-  {
-    path: '/addon/:id/product/:prodIdx',
-    element: <ProtectedRoute><ProductDetail /></ProtectedRoute>
   }
 ]);
 
