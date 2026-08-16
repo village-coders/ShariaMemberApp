@@ -5,6 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { createSignature } from '../api/signatures';
 import AppHeader from '../components/AppHeader';
 import { PenLine, Trash2, Save, ArrowLeft, RefreshCw, CheckCircle } from 'lucide-react';
+import Toast from '../components/Toast';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://hfa-portal-backend.onrender.com/api';
 
@@ -20,6 +21,8 @@ export default function SignatureSetup() {
   const [name, setName] = useState(user?.full_name || '');
   const [loading, setLoading] = useState(false);
   const [isEmpty, setIsEmpty] = useState(true);
+  const [toast, setToast] = useState(null);
+  const showToast = (message, type = 'info') => setToast({ message, type });
 
   // Check localStorage first, then API
   useEffect(() => {
@@ -72,7 +75,7 @@ export default function SignatureSetup() {
   const handleSave = async (e) => {
     e.preventDefault();
     if (sigCanvas.current.isEmpty()) {
-      alert('Please draw your signature first.');
+      showToast('Please draw your signature first.', 'error');
       return;
     }
     setLoading(true);
@@ -94,7 +97,7 @@ export default function SignatureSetup() {
       setExistingSig(savedSig);
       setRedrawMode(false);
     } catch (err) {
-      alert(err.message || 'Failed to save signature. Please try again.');
+      showToast(err.message || 'Failed to save signature. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -104,6 +107,7 @@ export default function SignatureSetup() {
   if (checking) {
     return (
       <>
+        <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
         <AppHeader title="Signature" />
         <div className="state-container" style={{ minHeight: '60vh' }}>
           <span className="spinner spinner-dark" style={{ width: 26, height: 26 }} />
@@ -121,6 +125,7 @@ export default function SignatureSetup() {
 
     return (
       <>
+        <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
         <AppHeader title="Signature" />
         <div className="app-content" style={{ paddingBottom: 40 }}>
           {/* Back button */}
@@ -173,6 +178,7 @@ export default function SignatureSetup() {
   // ---- Draw / Redraw mode ----
   return (
     <>
+      <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
       <AppHeader title="Signature Setup" />
       <div className="app-content" style={{ paddingBottom: 40 }}>
         {/* Back button */}

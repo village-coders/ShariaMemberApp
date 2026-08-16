@@ -17,6 +17,7 @@ import {
   Layers
 } from 'lucide-react';
 import LoadingState from '../components/LoadingState';
+import Toast from '../components/Toast';
 
 const ROLES = [
   { value: 'mufti',   label: "Shari'a Member (Mufti 1)" },
@@ -50,6 +51,8 @@ export default function LogsheetDetail() {
   const [selectedRole, setSelectedRole] = useState('mufti');
   const [submitting, setSubmitting] = useState(false);
   const [mySig, setMySig] = useState(null);
+  const [toast, setToast] = useState(null);
+  const showToast = (message, type = 'info') => setToast({ message, type });
 
   useEffect(() => {
     const stored = localStorage.getItem('my_signature');
@@ -157,16 +160,16 @@ export default function LogsheetDetail() {
 
   const handleSign = async () => {
     if (!mySig?.signature_url) {
-      alert('No stored signature found. Please set up your signature in the Signature tab first.');
+      showToast('No stored signature found. Please set up your signature in the Signature tab first.', 'error');
       return;
     }
     setSubmitting(true);
     try {
       await signLogsheet(logsheet._id || logsheet.id, selectedRole, mySig.signature_url, mySig.name, '');
-      alert('Logsheet signed successfully!');
+      showToast('Logsheet signed successfully!', 'success');
       navigate(-1);
     } catch (err) {
-      alert(err.message || 'Failed to sign logsheet');
+      showToast(err.message || 'Failed to sign logsheet', 'error');
     } finally {
       setSubmitting(false);
       setShowSignModal(false);
@@ -212,6 +215,7 @@ export default function LogsheetDetail() {
 
   return (
     <>
+      <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
       <div className="app-content" style={{ paddingBottom: 100 }}>
 
         {/* Back + title row */}
