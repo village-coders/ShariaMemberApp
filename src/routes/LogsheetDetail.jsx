@@ -20,8 +20,8 @@ import LoadingState from '../components/LoadingState';
 import Toast from '../components/Toast';
 
 const ROLES = [
-  { value: 'mufti',   label: "Shari'a Member (Mufti 1)" },
-  { value: 'mufti2',  label: "Shari'a Member (Mufti 2)" },
+  { value: 'mufti',   label: "Committee Member (Mufti 1)" },
+  { value: 'mufti2',  label: "Committee Member (Mufti 2)" },
   { value: 'manager', label: 'Certification Manager' },
   { value: 'ceo',     label: 'CEO' },
 ];

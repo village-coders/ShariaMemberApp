@@ -42,7 +42,7 @@ export default function DashboardLayout() {
 
   return (
     <>
-      <AppHeader title="Shari'a Member App" />
+      <AppHeader title="Committee Member App" />
       <div className="app-content">
         <Outlet />
       </div>

@@ -37,7 +37,7 @@ export default function Login() {
         <div className="login-logo">
           <img src={hfaLogo} alt="HFA Logo" />
         </div>
-        <h1 className="login-title">Shari'a Member App</h1>
+        <h1 className="login-title">Committee Member App</h1>
         <p className="login-subtitle">Sign in to your account</p>
 
         {error && <div className="alert alert-error">{error}</div>}
