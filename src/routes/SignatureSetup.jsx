@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import { AuthContext } from '../context/AuthContext';
 import { createSignature } from '../api/signatures';
-import AppHeader from '../components/AppHeader';
+// import AppHeader from '../components/AppHeader';
 import { PenLine, Trash2, Save, ArrowLeft, RefreshCw, CheckCircle } from 'lucide-react';
 import Toast from '../components/Toast';
 
@@ -108,7 +108,7 @@ export default function SignatureSetup() {
     return (
       <>
         <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
-        <AppHeader title="Signature" />
+        {/* <AppHeader title="Signature" /> */}
         <div className="state-container" style={{ minHeight: '60vh' }}>
           <span className="spinner spinner-dark" style={{ width: 26, height: 26 }} />
           <p className="state-message">Checking your signature…</p>
@@ -126,7 +126,7 @@ export default function SignatureSetup() {
     return (
       <>
         <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
-        <AppHeader title="Signature" />
+        {/* <AppHeader title="Signature" /> */}
         <div className="app-content" style={{ paddingBottom: 40 }}>
           {/* Back button */}
           <button
@@ -179,7 +179,7 @@ export default function SignatureSetup() {
   return (
     <>
       <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
-      <AppHeader title="Signature Setup" />
+      {/* <AppHeader title="Signature Setup" /> */}
       <div className="app-content" style={{ paddingBottom: 40 }}>
         {/* Back button */}
         <button
