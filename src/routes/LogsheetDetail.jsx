@@ -166,13 +166,14 @@ export default function LogsheetDetail() {
     setSubmitting(true);
     try {
       await signLogsheet(logsheet._id || logsheet.id, selectedRole, mySig.signature_url, mySig.name, '');
-      showToast('Logsheet signed successfully!', 'success');
-      navigate(-1);
+      setShowSignModal(false);
+      showToast('Logsheet signed successfully! ✓', 'success');
+      // Wait for the toast to be visible before navigating away
+      setTimeout(() => navigate(-1), 2000);
     } catch (err) {
       showToast(err.message || 'Failed to sign logsheet', 'error');
     } finally {
       setSubmitting(false);
-      setShowSignModal(false);
     }
   };
 
