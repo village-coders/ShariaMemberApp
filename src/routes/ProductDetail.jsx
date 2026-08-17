@@ -40,14 +40,69 @@ function FormDataViewer({ formData }) {
     if (typeof val === 'string') {
       const trimmed = val.trim();
       if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-        try {
-          return JSON.parse(trimmed);
-        } catch (e) {
-          return val;
-        }
+        try { return JSON.parse(trimmed); } catch (e) { return val; }
       }
     }
     return val;
+  };
+
+  const isFileVal = (v) =>
+    typeof v === 'string' && v !== '—' && (
+      v.startsWith('http://') || v.startsWith('https://') ||
+      v.startsWith('/api/files') || v.startsWith('/uploads') ||
+      /\.(pdf|png|jpe?g|doc|docx)$/i.test(v)
+    );
+
+  const renderField = (k, v) => {
+    const raw = v === null || v === undefined || v === '' ? '—' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+    const label = k.replace(/_/g, ' ');
+    const isHalal = k.includes('halal') || k.includes('certificate') || k.includes('status');
+    const isFile = isFileVal(raw);
+
+    return (
+      <div key={k} style={{
+        display: 'flex',
+        flexDirection: isFile ? 'column' : 'row',
+        justifyContent: 'space-between',
+        alignItems: isFile ? 'flex-start' : 'flex-start',
+        gap: isFile ? 6 : 8,
+        padding: '8px 0',
+        borderBottom: '1px solid var(--divider)',
+        flexWrap: 'wrap',
+      }}>
+        <span style={{ color: 'var(--text-3)', fontSize: 12, fontWeight: 600, textTransform: 'capitalize', flexShrink: 0, minWidth: 100, maxWidth: '50%' }}>
+          {label}
+        </span>
+        {isFile ? (
+          <a
+            href={getFileUrl(raw)}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              color: 'var(--primary)', fontWeight: 600, fontSize: 12,
+              textDecoration: 'none', background: 'var(--primary-subtle)',
+              padding: '6px 10px', borderRadius: 8, border: '1px solid var(--primary-border)',
+              width: '100%', boxSizing: 'border-box', justifyContent: 'center'
+            }}
+          >
+            <ExternalLink size={13} /> View Document
+          </a>
+        ) : isHalal && raw !== '—' ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            background: 'var(--primary-subtle)', color: 'var(--primary)',
+            padding: '3px 8px', borderRadius: 6, fontWeight: 600, fontSize: 11
+          }}>
+            <CheckCircle2 size={11} /> {raw}
+          </span>
+        ) : (
+          <span style={{ color: 'var(--text-1)', fontWeight: 600, fontSize: 13, textAlign: 'right', wordBreak: 'break-word', flex: 1 }}>
+            {raw}
+          </span>
+        )}
+      </div>
+    );
   };
 
   const renderSection = (key, rawData) => {
@@ -55,92 +110,30 @@ function FormDataViewer({ formData }) {
     const title = key.replace(/_/g, ' ').toUpperCase();
     const icon = getSectionIcon(key);
 
-    // Array of items (Ingredients, Processing aids, Animal derivatives, Packaging materials, etc.)
     if (Array.isArray(data)) {
       if (data.length === 0) return null;
 
-      // Array of objects -> render Mobile Card Stack
       if (typeof data[0] === 'object' && data[0] !== null) {
         return (
           <div key={key} style={{ marginBottom: 16 }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 8,
-              padding: '0 2px'
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {icon}
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', textTransform: 'uppercase' }}>
-                  {title}
-                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', textTransform: 'uppercase' }}>{title}</span>
               </div>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-subtle)', padding: '2px 8px', borderRadius: 99 }}>
                 {data.length} item{data.length > 1 ? 's' : ''}
               </span>
             </div>
-
-            {/* Mobile Card Stack */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {data.map((row, rIdx) => {
-                const entries = Object.entries(row);
                 const titleVal = row.name || row.product_name || row.packaging_material || row.constituent || `Item #${rIdx + 1}`;
-
                 return (
-                  <div
-                    key={rIdx}
-                    style={{
-                      background: '#ffffff',
-                      borderRadius: 12,
-                      border: '1px solid var(--border)',
-                      padding: '12px 14px',
-                      boxShadow: 'var(--shadow-xs)'
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)', marginBottom: 8, borderBottom: '1px solid var(--divider)', paddingBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>#{rIdx + 1}. {typeof titleVal === 'object' ? JSON.stringify(titleVal) : String(titleVal)}</span>
+                  <div key={rIdx} style={{ background: '#ffffff', borderRadius: 12, border: '1px solid var(--border)', padding: '12px 14px', boxShadow: 'var(--shadow-xs)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)', marginBottom: 4, paddingBottom: 6, borderBottom: '1px solid var(--divider)' }}>
+                      #{rIdx + 1}. {typeof titleVal === 'object' ? JSON.stringify(titleVal) : String(titleVal)}
                     </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {entries.map(([k, v]) => {
-                        const displayVal = v === null || v === undefined || v === '' ? '—' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
-                        const isHalal = k.includes('halal') || k.includes('certificate') || k.includes('status');
-                        const isFileLink = typeof displayVal === 'string' && displayVal !== '—' && (
-                          displayVal.startsWith('http://') ||
-                          displayVal.startsWith('https://') ||
-                          displayVal.startsWith('/api/files') ||
-                          displayVal.startsWith('/uploads') ||
-                          displayVal.match(/\.(pdf|png|jpe?g|doc|docx)$/i)
-                        );
-
-                        return (
-                          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, gap: 12 }}>
-                            <span style={{ color: 'var(--text-3)', textTransform: 'capitalize', flexShrink: 0 }}>
-                              {k.replace(/_/g, ' ')}:
-                            </span>
-                            <span style={{ color: 'var(--text-1)', fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>
-                              {isFileLink ? (
-                                <a
-                                  href={getFileUrl(displayVal)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}
-                                >
-                                  <ExternalLink size={12} /> View Document
-                                </a>
-                              ) : isHalal && displayVal !== '—' ? (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--primary-subtle)', color: 'var(--primary)', padding: '2px 8px', borderRadius: 6, fontWeight: 600, fontSize: 11 }}>
-                                  <CheckCircle2 size={12} /> {displayVal}
-                                </span>
-                              ) : (
-                                displayVal
-                              )}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    {Object.entries(row).map(([k, v]) => renderField(k, v))}
                   </div>
                 );
               })}
@@ -149,7 +142,7 @@ function FormDataViewer({ formData }) {
         );
       }
 
-      // Array of primitive strings
+      // Primitive array
       return (
         <div key={key} style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -166,46 +159,35 @@ function FormDataViewer({ formData }) {
       );
     }
 
-    // Single object value
     if (typeof data === 'object' && data !== null) {
       return (
         <div key={key} style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
             {icon} {title}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {Object.entries(data).map(([k, v]) => (
-              <div key={k} style={{ background: '#ffffff', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--text-3)', display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>{k.replace(/_/g, ' ')}</span>
-                <strong style={{ color: 'var(--text-1)', fontSize: 12, wordBreak: 'break-word' }}>{String(v)}</strong>
-              </div>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {Object.entries(data).map(([k, v]) => renderField(k, v))}
           </div>
         </div>
       );
     }
 
-    // Scalar String / Number / Boolean
+    // Scalar
     const displayVal = String(data);
     const isYesNo = ['yes', 'no', 'true', 'false'].includes(displayVal.toLowerCase());
-    const isPositive = displayVal.toLowerCase() === 'yes' || displayVal.toLowerCase() === 'true';
+    const isPositive = ['yes', 'true'].includes(displayVal.toLowerCase());
 
     return (
-      <div key={key} style={{ background: '#ffffff', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div key={key} style={{ background: '#ffffff', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
         <span style={{ color: 'var(--text-3)', fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>
           {key.replace(/_/g, ' ')}
         </span>
         {isYesNo ? (
           <span style={{
-            fontSize: 11,
-            fontWeight: 700,
+            fontSize: 11, fontWeight: 700,
             color: isPositive ? 'var(--primary)' : 'var(--text-3)',
             background: isPositive ? 'var(--primary-subtle)' : '#f1f5f9',
-            padding: '3px 10px',
-            borderRadius: 99,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4
+            padding: '3px 10px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', gap: 4
           }}>
             {isPositive ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
             {displayVal.toUpperCase()}
@@ -233,7 +215,7 @@ function FormDataViewer({ formData }) {
   return (
     <div style={{ marginTop: 10 }}>
       {simpleEntries.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+        <div style={{ background: '#fff', borderRadius: 10, border: '1px solid var(--border)', padding: '0 14px', marginBottom: 14 }}>
           {simpleEntries.map(([k, v]) => renderSection(k, v))}
         </div>
       )}
