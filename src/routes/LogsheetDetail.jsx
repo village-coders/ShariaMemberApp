@@ -214,6 +214,152 @@ export default function LogsheetDetail() {
 
   const isAddon = logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(appDetails?.action_type);
 
+  // Aggregate all logsheet and application documents
+  const allDocuments = [];
+
+  // 1. Primary Logsheet Document
+  if (logsheet.document_url) {
+    allDocuments.push({
+      title: 'Main Logsheet Document',
+      url: logsheet.document_url,
+      category: 'Logsheet'
+    });
+  }
+
+  // 2. Logsheet Document URLs array
+  if (Array.isArray(logsheet.document_urls)) {
+    logsheet.document_urls.forEach((d, i) => {
+      if (d?.url) {
+        allDocuments.push({
+          title: d.name || `Logsheet Attachment #${i + 1}`,
+          url: d.url,
+          uploaded_at: d.uploaded_at,
+          category: 'Logsheet File'
+        });
+      }
+    });
+  }
+
+  // 3. Logsheet Audit Reports
+  if (Array.isArray(logsheet.audit_reports)) {
+    logsheet.audit_reports.forEach((r, i) => {
+      if (r?.url) {
+        allDocuments.push({
+          title: r.name || `Audit Report #${i + 1}`,
+          url: r.url,
+          uploaded_at: r.uploaded_at,
+          category: 'Audit Report'
+        });
+      }
+    });
+  }
+
+  // 4. Logsheet NC Reports Files
+  if (Array.isArray(logsheet.nc_reports_files)) {
+    logsheet.nc_reports_files.forEach((n, i) => {
+      if (n?.url) {
+        allDocuments.push({
+          title: n.name || `Non-Conformity File #${i + 1}`,
+          url: n.url,
+          uploaded_at: n.uploaded_at,
+          category: 'NC Report'
+        });
+      }
+    });
+  }
+
+  // 5. Application Documents (if linked main application)
+  if (appDetails?.documents) {
+    const docMap = [
+      { key: 'halal_policy', label: 'Halal Policy Document' },
+      { key: 'ingredient_list', label: 'Ingredient List Document' },
+      { key: 'floor_plan', label: 'Site / Facility Floor Plan' },
+      { key: 'haccp_plan', label: 'HACCP Plan Document' },
+    ];
+    docMap.forEach(({ key, label }) => {
+      if (appDetails.documents[key]) {
+        allDocuments.push({
+          title: label,
+          url: appDetails.documents[key],
+          category: 'Application Document'
+        });
+      }
+    });
+    if (Array.isArray(appDetails.documents.supporting_docs)) {
+      appDetails.documents.supporting_docs.forEach((url, i) => {
+        if (url) {
+          allDocuments.push({
+            title: `Supporting Document #${i + 1}`,
+            url,
+            category: 'Supporting Document'
+          });
+        }
+      });
+    }
+  }
+
+  // 6. Application Audit Reports
+  if (Array.isArray(appDetails?.audit_reports)) {
+    appDetails.audit_reports.forEach((r, i) => {
+      if (r?.url && !allDocuments.some(d => d.url === r.url)) {
+        allDocuments.push({
+          title: r.name || `Application Audit Report #${i + 1}`,
+          url: r.url,
+          uploaded_at: r.uploaded_at,
+          category: 'Audit Report'
+        });
+      }
+    });
+  }
+
+  // 7. Application NC Reports Attachments
+  if (Array.isArray(appDetails?.nc_reports)) {
+    appDetails.nc_reports.forEach((nc, i) => {
+      if (nc.url && !allDocuments.some(d => d.url === nc.url)) {
+        allDocuments.push({
+          title: `NC Attachment #${i + 1} (${nc.status || 'Report'})`,
+          url: nc.url,
+          category: 'NC Attachment'
+        });
+      }
+      if (nc.client_response_url && !allDocuments.some(d => d.url === nc.client_response_url)) {
+        allDocuments.push({
+          title: `NC Client Response Document #${i + 1}`,
+          url: nc.client_response_url,
+          category: 'NC Client Response'
+        });
+      }
+    });
+  }
+
+  // 8. Addon Approval Form Documents
+  if (appDetails?.product_approval_form) {
+    const paf = appDetails.product_approval_form;
+    if (paf.form_file_url) {
+      allDocuments.push({
+        title: 'Product Approval Form Template',
+        url: paf.form_file_url,
+        category: 'Approval Form'
+      });
+    }
+    if (paf.more_info_file_url) {
+      allDocuments.push({
+        title: 'More Info Request Attachment',
+        url: paf.more_info_file_url,
+        category: 'Approval Form'
+      });
+    }
+    if (paf.client_reply_file_url) {
+      allDocuments.push({
+        title: 'Client Reply Attachment',
+        url: paf.client_reply_file_url,
+        category: 'Client Attachment'
+      });
+    }
+  }
+
+  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+
   return (
     <>
       <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
@@ -256,24 +402,160 @@ export default function LogsheetDetail() {
           </div>
         </div>
 
-        {/* Assessment Card */}
-        <p className="section-heading">Logsheet Assessment</p>
+        {/* Company & Site Details */}
+        <p className="section-heading">Company & Site Details</p>
         <div className="card" style={{ padding: '4px 16px' }}>
           {[
-            { label: 'Auditors', value: logsheet.auditors || '—' },
+            { label: 'Company Name', value: logsheet.company_name || appDetails?.client_id?.company_name || '—' },
+            { label: 'Company Address', value: logsheet.company_address || appDetails?.establishment_address || '—' },
+            { label: 'Manufacturing Address', value: logsheet.manufacturing_address || appDetails?.site_id?.address || '—' },
+            { label: 'Contact Person', value: logsheet.contact_person || appDetails?.contact_name || '—' },
+            { label: 'Contact Email', value: logsheet.contact_email || appDetails?.contact_email || '—' },
+            { label: 'Nature of Business', value: logsheet.nature_of_business || '—' },
+            { label: 'Product Category / Scope', value: logsheet.product_category || appDetails?.category || appDetails?.scope || '—' },
+            { label: 'Issue Date', value: formatDate(logsheet.issue_date) || '—' },
+            { label: 'Expiry Date', value: formatDate(logsheet.expiry_date) || '—' },
+            { label: 'Current Cycle Start', value: formatDate(logsheet.current_cycle_start) || '—' },
+            { label: 'Original Cycle Start', value: formatDate(logsheet.original_cycle_start) || '—' },
+          ].map(({ label, value }) => (
+            <div key={label} className="detail-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
+              <div className="detail-label" style={{ fontSize: 12, color: 'var(--text-3)' }}>{label}</div>
+              <div className="detail-value" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', textAlign: 'right', wordBreak: 'break-word' }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Assessment Card */}
+        <p className="section-heading" style={{ marginTop: 16 }}>Review & Audit Assessment</p>
+        <div className="card" style={{ padding: '4px 16px' }}>
+          {[
+            { label: 'Audit Type', value: logsheet.audit_type || '—' },
+            { label: 'Audit Date', value: formatDate(logsheet.audit_date) || '—' },
+            { label: 'Lead Auditor(s)', value: logsheet.auditors || '—' },
             { label: 'NCs Close Status', value: logsheet.ncs_close || '—' },
             { label: 'Documentation Status', value: logsheet.docs_satisfactory || '—' },
             { label: 'Pork-Free Statement', value: logsheet.pork_free_statement || '—' },
-            { label: 'Annual Certificate', value: logsheet.annual_certificate || '—' },
-            { label: 'Batch Certificate', value: logsheet.batch_certificate || '—' },
             { label: 'Reviewed By', value: logsheet.reviewed_by || logsheet.reviewer_name || '—' },
-            { label: 'Logsheet Comment', value: logsheet.comment || 'None' },
+            { label: 'Review Date', value: formatDate(logsheet.review_date) || '—' },
+            { label: 'Logsheet Comments', value: logsheet.comment || 'None' },
           ].map(({ label, value }) => (
-            <div key={label} className="detail-row">
-              <div className="detail-label">{label}</div>
-              <div className="detail-value">{value}</div>
+            <div key={label} className="detail-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
+              <div className="detail-label" style={{ fontSize: 12, color: 'var(--text-3)' }}>{label}</div>
+              <div className="detail-value" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', textAlign: 'right', wordBreak: 'break-word' }}>{value}</div>
             </div>
           ))}
+        </div>
+
+        {/* Certificate Compliance Status */}
+        <p className="section-heading" style={{ marginTop: 16 }}>Certificate Status</p>
+        <div className="card" style={{ padding: '4px 16px' }}>
+          {[
+            { label: 'Annual Certificate', value: logsheet.annual_certificate || '—' },
+            { label: 'Batch Certificate', value: logsheet.batch_certificate || '—' },
+            { label: 'New Products Only', value: logsheet.new_products_only || '—' },
+            { label: 'New Site / Line', value: logsheet.new_site_line || '—' },
+            { label: 'New Client', value: logsheet.new_client || '—' },
+            { label: 'Agreement Signed', value: logsheet.agreement_signed || '—' },
+          ].map(({ label, value }) => {
+            const isYes = String(value).toLowerCase() === 'yes';
+            const isNo = String(value).toLowerCase() === 'no';
+            return (
+              <div key={label} className="detail-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
+                <div className="detail-label" style={{ fontSize: 12, color: 'var(--text-3)' }}>{label}</div>
+                <div className="detail-value" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>
+                  {isYes ? (
+                    <span style={{ color: 'var(--primary)', background: 'var(--primary-subtle)', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 700 }}>
+                      YES
+                    </span>
+                  ) : isNo ? (
+                    <span style={{ color: 'var(--text-3)', background: '#f1f5f9', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                      NO
+                    </span>
+                  ) : (
+                    value
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* All Logsheet & Application Documents */}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <p className="section-heading" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <FileText size={16} /> Attached Documents & Reports ({allDocuments.length})
+            </p>
+          </div>
+
+          {allDocuments.length === 0 ? (
+            <div className="card" style={{ padding: 16, textAlign: 'center' }}>
+              <FileText size={22} color="var(--text-3)" style={{ marginBottom: 4 }} />
+              <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
+                No document attachments uploaded for this logsheet.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {allDocuments.map((doc, dIdx) => (
+                <div
+                  key={dIdx}
+                  className="card"
+                  style={{
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    background: '#ffffff',
+                    border: '1px solid var(--border)',
+                    boxShadow: 'var(--shadow-xs)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', wordBreak: 'break-word' }}>
+                        {doc.title}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-subtle)', padding: '2px 8px', borderRadius: 99 }}>
+                          {doc.category}
+                        </span>
+                        {doc.uploaded_at && (
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                            {formatDate(doc.uploaded_at)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <a
+                    href={getFileUrl(doc.url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      width: '100%',
+                      fontSize: 12,
+                      color: 'var(--primary)',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      background: 'var(--primary-subtle)',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid var(--primary-border)',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <ExternalLink size={13} /> Preview Document
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Assigned Products & Approval Form Section */}
@@ -349,7 +631,7 @@ export default function LogsheetDetail() {
                             </span>
                           ) : (
                             <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
-                              Tap to view
+                              Tap to view form
                             </span>
                           )}
                         </div>
@@ -382,9 +664,9 @@ export default function LogsheetDetail() {
                   { label: 'Action Type', value: appDetails.action_type?.toUpperCase() || '—' },
                   { label: 'Client Message', value: appDetails.message || '—' },
                 ].map(({ label, value }) => (
-                  <div key={label} className="detail-row">
-                    <div className="detail-label">{label}</div>
-                    <div className="detail-value">{value}</div>
+                  <div key={label} className="detail-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
+                    <div className="detail-label" style={{ fontSize: 12, color: 'var(--text-3)' }}>{label}</div>
+                    <div className="detail-value" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>{value}</div>
                   </div>
                 ))
               ) : (
@@ -395,9 +677,9 @@ export default function LogsheetDetail() {
                   { label: 'Establishment Name', value: appDetails.establishment_name || '—' },
                   { label: 'Scope', value: appDetails.scope || '—' },
                 ].map(({ label, value }) => (
-                  <div key={label} className="detail-row">
-                    <div className="detail-label">{label}</div>
-                    <div className="detail-value">{value}</div>
+                  <div key={label} className="detail-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
+                    <div className="detail-label" style={{ fontSize: 12, color: 'var(--text-3)' }}>{label}</div>
+                    <div className="detail-value" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>{value}</div>
                   </div>
                 ))
               )}
