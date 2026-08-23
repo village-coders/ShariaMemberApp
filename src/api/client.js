@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://hfa-portal-backend.onrender.com/api';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://backend.hfaportal.company/api';
 export const BACKEND_URL = API_BASE.replace(/\/api\/?$/, '');
 
 export const getFileUrl = (url) => {
