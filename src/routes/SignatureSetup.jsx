@@ -7,7 +7,7 @@ import { createSignature } from '../api/signatures';
 import { PenLine, Trash2, Save, ArrowLeft, RefreshCw, CheckCircle } from 'lucide-react';
 import Toast from '../components/Toast';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://hfa-portal-backend.onrender.com/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://backend.hfaportal.company/api';
 
 export default function SignatureSetup() {
   const { user } = useContext(AuthContext);
@@ -120,7 +120,7 @@ export default function SignatureSetup() {
   // ---- Existing signature preview (not in redraw mode) ----
   if (existingSig && !redrawMode) {
     const sigUrl = existingSig.signature_url?.startsWith('/')
-      ? `https://hfa-portal-backend.onrender.com${existingSig.signature_url}`
+      ? `https://backend.hfaportal.company${existingSig.signature_url}`
       : existingSig.signature_url;
 
     return (
