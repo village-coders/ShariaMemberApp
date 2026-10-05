@@ -1,20 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
 import { getLogsheetById, getApplicationById, getAddOnById, signLogsheet } from '../api/logsheets';
 import { API_BASE, getFileUrl } from '../api/client';
+import { AuthContext } from '../context/AuthContext';
 import {
   ArrowLeft,
   PenLine,
   CheckCircle,
-  Calendar,
   FileText,
   Package,
   ChevronRight,
   ExternalLink,
   CheckCircle2,
-  AlertCircle,
-  Layers
+  AlertCircle
 } from 'lucide-react';
 import LoadingState from '../components/LoadingState';
 import Toast from '../components/Toast';
@@ -47,6 +46,7 @@ export default function LogsheetDetail() {
   const [appDetails, setAppDetails] = useState(state?.app || null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  const { user, mySignature, refreshSignature } = useContext(AuthContext);
   const [showSignModal, setShowSignModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState('mufti');
   const [submitting, setSubmitting] = useState(false);
@@ -59,7 +59,9 @@ export default function LogsheetDetail() {
     if (stored) {
       try {
         setMySig(JSON.parse(stored));
-      } catch (e) {}
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
@@ -158,18 +160,49 @@ export default function LogsheetDetail() {
   const isCompleted = logsheet.status?.includes('Waiting For Certificate') || logsheet.status?.includes('Completed');
   const totalSigned = [logsheet.mufti_signature, logsheet.mufti2_signature, logsheet.manager_signature, logsheet.ceo_signature].filter(Boolean).length;
 
+  const isRoleSigned = (roleVal) => {
+    if (!logsheet) return false;
+    if (roleVal === 'mufti') return Boolean(logsheet.mufti_signature);
+    if (roleVal === 'mufti2') return Boolean(logsheet.mufti2_signature);
+    if (roleVal === 'manager') return Boolean(logsheet.manager_signature);
+    if (roleVal === 'ceo') return Boolean(logsheet.ceo_signature);
+    return false;
+  };
+
+  const activeSig = mySignature || mySig;
+
+  const openSignModal = () => {
+    if (isRoleSigned(selectedRole)) {
+      const firstUnsigned = ROLES.find(r => !isRoleSigned(r.value));
+      if (firstUnsigned) setSelectedRole(firstUnsigned.value);
+    }
+    if (!activeSig && user) {
+      refreshSignature(user);
+    }
+    setShowSignModal(true);
+  };
+
   const handleSign = async () => {
-    if (!mySig?.signature_url) {
+    if (!activeSig?.signature_url) {
       showToast('No stored signature found. Please set up your signature in the Signature tab first.', 'error');
+      return;
+    }
+    if (isRoleSigned(selectedRole)) {
+      showToast(`This role (${selectedRole}) has already been signed.`, 'error');
       return;
     }
     setSubmitting(true);
     try {
-      await signLogsheet(logsheet._id || logsheet.id, selectedRole, mySig.signature_url, mySig.name, '');
+      const signerName = activeSig.name || user?.full_name || user?.username || 'Authorized Signatory';
+      const res = await signLogsheet(logsheet._id || logsheet.id, selectedRole, activeSig.signature_url, signerName, '');
+      const updated = res?.data || res;
+      if (updated && updated._id) {
+        setLogsheet(updated);
+      }
       setShowSignModal(false);
       showToast('Logsheet signed successfully! ✓', 'success');
       // Wait for the toast to be visible before navigating away
-      setTimeout(() => navigate(-1), 2000);
+      setTimeout(() => navigate(-1), 1800);
     } catch (err) {
       showToast(err.message || 'Failed to sign logsheet', 'error');
     } finally {
@@ -708,7 +741,7 @@ export default function LogsheetDetail() {
 
         {/* Action */}
         {!isCompleted && (
-          <button className="btn btn-primary" onClick={() => setShowSignModal(true)} style={{ marginTop: 16, borderRadius: 14, padding: 14 }}>
+          <button className="btn btn-primary" onClick={openSignModal} style={{ marginTop: 16, borderRadius: 14, padding: 14 }}>
             <PenLine size={18} /> Sign Logsheet
           </button>
         )}
@@ -726,28 +759,115 @@ export default function LogsheetDetail() {
         <div className="modal-overlay">
           <div className="modal-sheet">
             <h2 className="modal-title">Sign as Committee Member</h2>
-            <p className="modal-message">Your saved signature (<strong>{mySig?.name || 'Not set'}</strong>) will be attached under the selected role.</p>
 
-            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10 }}>Select your role</p>
-            <div className="chip-group" style={{ marginBottom: 20 }}>
-              {ROLES.map(r => (
-                <button
-                  key={r.value}
-                  className={`chip${selectedRole === r.value ? ' selected' : ''}`}
-                  onClick={() => setSelectedRole(r.value)}
-                  type="button"
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+            {activeSig?.signature_url ? (
+              <>
+                <p className="modal-message" style={{ marginBottom: 12 }}>
+                  Your official signature on file will be attached under the selected role:
+                </p>
 
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowSignModal(false)} disabled={submitting}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSign} disabled={submitting}>
-                {submitting ? <span className="spinner" /> : 'Confirm Signature'}
-              </button>
-            </div>
+                {/* Signature Preview Card */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  background: '#f8fafc',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  marginBottom: 16
+                }}>
+                  <div style={{
+                    width: 70,
+                    height: 44,
+                    background: '#ffffff',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 2,
+                    flexShrink: 0
+                  }}>
+                    <img
+                      src={getFileUrl(activeSig.signature_url)}
+                      alt="Signature"
+                      style={{ maxWidth: '100%', maxHeight: 40, objectFit: 'contain' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {activeSig.name || user?.full_name || user?.username || 'Authorized Signatory'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--status-done-text)', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 }}>
+                      <CheckCircle2 size={12} /> Active signature on file
+                    </div>
+                  </div>
+                </div>
+
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10 }}>Select your role</p>
+                <div className="chip-group" style={{ marginBottom: 20 }}>
+                  {ROLES.map(r => {
+                    const alreadySigned = isRoleSigned(r.value);
+                    return (
+                      <button
+                        key={r.value}
+                        className={`chip${selectedRole === r.value ? ' selected' : ''}`}
+                        onClick={() => !alreadySigned && setSelectedRole(r.value)}
+                        disabled={alreadySigned}
+                        type="button"
+                        style={alreadySigned ? { opacity: 0.5, cursor: 'not-allowed', background: '#f1f5f9' } : {}}
+                      >
+                        {r.label} {alreadySigned ? '✓ (Signed)' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="modal-actions">
+                  <button className="btn btn-secondary" onClick={() => setShowSignModal(false)} disabled={submitting}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleSign} disabled={submitting || isRoleSigned(selectedRole)}>
+                    {submitting ? <span className="spinner" /> : 'Confirm Signature'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: 10,
+                  padding: '14px 16px',
+                  marginBottom: 16
+                }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <AlertCircle size={18} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#991b1b', marginBottom: 2 }}>
+                        No Signature on File
+                      </p>
+                      <p style={{ fontSize: 12, color: '#7f1d1d', lineHeight: 1.5, margin: 0 }}>
+                        No signature is currently attached to your account. You can upload an image or draw your signature in the Signature tab.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="modal-actions">
+                  <button className="btn btn-secondary" onClick={() => setShowSignModal(false)}>Cancel</button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setShowSignModal(false);
+                      navigate('/setup-signature');
+                    }}
+                  >
+                    Set Up Signature
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
