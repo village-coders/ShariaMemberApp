@@ -63,11 +63,21 @@ export default function ManageLogsheets() {
       // 2. Search match
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase().trim();
+        const refNo = (
+          l.application_number ||
+          l.application_id?.application_number ||
+          l.addon_application_id?.application_number ||
+          l.applications?.application_number ||
+          l.direct_ref ||
+          l.kfc_ref ||
+          l.legacy_id ||
+          (l._id ? `APP-${String(l._id).slice(-6)}` : '')
+        ).toLowerCase();
         const company = (l.company_name || l.client_id?.company_name || '').toLowerCase();
         const contact = (l.contact_person || l.client_id?.full_name || '').toLowerCase();
         const auditType = (l.audit_type || '').toLowerCase();
         const category = (l.product_category || '').toLowerCase();
-        return company.includes(term) || contact.includes(term) || auditType.includes(term) || category.includes(term);
+        return refNo.includes(term) || company.includes(term) || contact.includes(term) || auditType.includes(term) || category.includes(term);
       }
 
       return true;
@@ -151,7 +161,7 @@ export default function ManageLogsheets() {
           className="form-control"
           value={searchTerm}
           onChange={e => handleSearchChange(e.target.value)}
-          placeholder="Search by company, contact, or audit..."
+          placeholder="Search by ref no, company, contact, or audit..."
           style={{
             paddingLeft: 36,
             paddingRight: searchTerm ? 36 : 14,

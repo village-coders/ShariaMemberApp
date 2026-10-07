@@ -395,6 +395,14 @@ export default function ProductDetail() {
 
         {/* Company Info Row */}
         <div className="card" style={{ padding: '4px 16px' }}>
+          {(appData?.application_number || logsheet?.application_number || logsheet?.application_id?.application_number) && (
+            <div className="detail-row">
+              <div className="detail-label" style={{ fontWeight: 600 }}>Ref No.</div>
+              <div className="detail-value" style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--primary)' }}>
+                {appData?.application_number || logsheet?.application_number || logsheet?.application_id?.application_number}
+              </div>
+            </div>
+          )}
           <div className="detail-row">
             <div className="detail-label">Company</div>
             <div className="detail-value">{companyName}</div>

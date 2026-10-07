@@ -13,6 +13,16 @@ export default function LogsheetListItem({ logsheet }) {
 
   const isAddon = logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(logsheet.product_approval_form);
 
+  const refNumber =
+    logsheet.application_number ||
+    logsheet.application_id?.application_number ||
+    logsheet.addon_application_id?.application_number ||
+    logsheet.applications?.application_number ||
+    logsheet.direct_ref ||
+    logsheet.kfc_ref ||
+    logsheet.legacy_id ||
+    (logsheet._id ? `APP-${String(logsheet._id).slice(-6).toUpperCase()}` : null);
+
   const signatureRoles = [
     { label: 'Mufti 1', name: logsheet.mufti_sign_name, signature: logsheet.mufti_signature, date: logsheet.mufti_sign_date },
     { label: 'Mufti 2', name: logsheet.mufti2_sign_name, signature: logsheet.mufti2_signature, date: logsheet.mufti2_sign_date },
@@ -54,8 +64,25 @@ export default function LogsheetListItem({ logsheet }) {
           )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="card-title" style={{ marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {company}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+            <div className="card-title" style={{ margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {company}
+            </div>
+            {refNumber && (
+              <span style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '2px 7px',
+                borderRadius: 6,
+                background: '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                color: 'var(--primary)',
+                fontFamily: 'monospace',
+                flexShrink: 0
+              }}>
+                Ref: {refNumber}
+              </span>
+            )}
           </div>
 
           {/* Type Badge & Date */}

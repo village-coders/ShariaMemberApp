@@ -393,20 +393,48 @@ export default function LogsheetDetail() {
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 
+  const refNumber =
+    logsheet.application_number ||
+    logsheet.application_id?.application_number ||
+    logsheet.addon_application_id?.application_number ||
+    logsheet.applications?.application_number ||
+    appDetails?.application_number ||
+    logsheet.direct_ref ||
+    logsheet.kfc_ref ||
+    logsheet.legacy_id ||
+    (logsheet._id ? `APP-${String(logsheet._id).slice(-6).toUpperCase()}` : '—');
+
   return (
     <>
       <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
       <div className="app-content" style={{ paddingBottom: 100 }}>
 
         {/* Back + title row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <button
-            onClick={() => navigate(-1)}
-            style={{ background: 'var(--primary-subtle)', border: 'none', color: 'var(--primary)', cursor: 'pointer', borderRadius: 10, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}
-          >
-            <ArrowLeft size={15} /> Back
-          </button>
-          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Logsheet Detail</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => navigate(-1)}
+              style={{ background: 'var(--primary-subtle)', border: 'none', color: 'var(--primary)', cursor: 'pointer', borderRadius: 10, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}
+            >
+              <ArrowLeft size={15} /> Back
+            </button>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>Logsheet Detail</span>
+          </div>
+          {refNumber && refNumber !== '—' && (
+            <span style={{
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '4px 10px',
+              borderRadius: 8,
+              background: 'var(--primary-subtle)',
+              color: 'var(--primary)',
+              fontFamily: 'monospace',
+              letterSpacing: '0.02em',
+              border: '1px solid var(--primary-border, rgba(16,185,129,0.2))'
+            }}>
+              Ref: #{refNumber}
+            </span>
+          )}
         </div>
 
         {/* Hero Card */}
@@ -416,8 +444,27 @@ export default function LogsheetDetail() {
               <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
                 {logsheet.company_name || appDetails?.client_id?.company_name || 'Applicant Company'}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
-                {logsheet.audit_type || (isAddon ? 'Add-on Application' : 'Halal Audit')}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                  {logsheet.audit_type || (isAddon ? 'Add-on Application' : 'Halal Audit')}
+                </span>
+                {refNumber && refNumber !== '—' && (
+                  <>
+                    <span style={{ color: 'var(--text-3)', fontSize: 12 }}>•</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: 'var(--primary)',
+                      fontFamily: 'monospace',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      padding: '2px 8px',
+                      borderRadius: 6
+                    }}>
+                      Ref No: {refNumber}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
             <StatusBadge status={logsheet.status} />
@@ -439,6 +486,7 @@ export default function LogsheetDetail() {
         <p className="section-heading">Company & Site Details</p>
         <div className="card" style={{ padding: '4px 16px' }}>
           {[
+            { label: 'Ref No.', value: refNumber, isRef: true },
             { label: 'Company Name', value: logsheet.company_name || appDetails?.client_id?.company_name || '—' },
             { label: 'Company Address', value: logsheet.company_address || appDetails?.establishment_address || '—' },
             { label: 'Manufacturing Address', value: logsheet.manufacturing_address || appDetails?.site_id?.address || '—' },
@@ -450,10 +498,19 @@ export default function LogsheetDetail() {
             { label: 'Expiry Date', value: formatDate(logsheet.expiry_date) || '—' },
             { label: 'Current Cycle Start', value: formatDate(logsheet.current_cycle_start) || '—' },
             { label: 'Original Cycle Start', value: formatDate(logsheet.original_cycle_start) || '—' },
-          ].map(({ label, value }) => (
+          ].map(({ label, value, isRef }) => (
             <div key={label} className="detail-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
-              <div className="detail-label" style={{ fontSize: 12, color: 'var(--text-3)' }}>{label}</div>
-              <div className="detail-value" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', textAlign: 'right', wordBreak: 'break-word' }}>{value}</div>
+              <div className="detail-label" style={{ fontSize: 12, color: isRef ? 'var(--text-1)' : 'var(--text-3)', fontWeight: isRef ? 700 : 500 }}>{label}</div>
+              <div className="detail-value" style={{
+                fontSize: 13,
+                fontWeight: isRef ? 800 : 600,
+                color: isRef ? 'var(--primary)' : 'var(--text-1)',
+                fontFamily: isRef ? 'monospace' : 'inherit',
+                textAlign: 'right',
+                wordBreak: 'break-word'
+              }}>
+                {value}
+              </div>
             </div>
           ))}
         </div>
@@ -758,7 +815,10 @@ export default function LogsheetDetail() {
       {showSignModal && (
         <div className="modal-overlay">
           <div className="modal-sheet">
-            <h2 className="modal-title">Sign as Committee Member</h2>
+            <h2 className="modal-title" style={{ marginBottom: 4 }}>Sign as Committee Member</h2>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
+              {logsheet.company_name || 'Applicant'} &bull; <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary)' }}>Ref: #{refNumber}</span>
+            </div>
 
             {activeSig?.signature_url ? (
               <>
