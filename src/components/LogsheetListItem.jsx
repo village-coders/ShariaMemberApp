@@ -14,7 +14,7 @@ export default function LogsheetListItem({ logsheet }) {
   const isAddon = logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(logsheet.product_approval_form);
 
   const refNumber =
-    logsheet.application_number ||
+    logsheet.logsheet_number ||
     logsheet.application_id?.application_number ||
     logsheet.addon_application_id?.application_number ||
     logsheet.applications?.application_number ||
