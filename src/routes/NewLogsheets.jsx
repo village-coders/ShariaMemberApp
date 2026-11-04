@@ -38,6 +38,7 @@ export default function NewLogsheets() {
     if (!searchTerm.trim()) return logsheets;
     const term = searchTerm.toLowerCase().trim();
     return logsheets.filter(l => {
+      const logsheetNo = (l.logsheet_number || '').toLowerCase();
       const refNo = (
         l.application_number ||
         l.application_id?.application_number ||
@@ -49,10 +50,25 @@ export default function NewLogsheets() {
         (l._id ? `APP-${String(l._id).slice(-6)}` : '')
       ).toLowerCase();
       const company = (l.company_name || l.client_id?.company_name || '').toLowerCase();
+      const site = (
+        l.site_name ||
+        (typeof l.site_id === 'object' ? l.site_id?.name || l.site_id?.address : '') ||
+        l.application_id?.site_name ||
+        l.manufacturing_address ||
+        ''
+      ).toLowerCase();
       const contact = (l.contact_person || l.client_id?.full_name || '').toLowerCase();
       const auditType = (l.audit_type || '').toLowerCase();
       const category = (l.product_category || '').toLowerCase();
-      return refNo.includes(term) || company.includes(term) || contact.includes(term) || auditType.includes(term) || category.includes(term);
+      return (
+        logsheetNo.includes(term) ||
+        refNo.includes(term) ||
+        company.includes(term) ||
+        site.includes(term) ||
+        contact.includes(term) ||
+        auditType.includes(term) ||
+        category.includes(term)
+      );
     });
   }, [logsheets, searchTerm]);
 
@@ -95,7 +111,7 @@ export default function NewLogsheets() {
             className="form-control"
             value={searchTerm}
             onChange={e => handleSearchChange(e.target.value)}
-            placeholder="Search by ref no, company, contact, or audit type..."
+            placeholder="Search by ref / logsheet no, company, site, contact..."
             style={{
               paddingLeft: 36,
               paddingRight: searchTerm ? 36 : 14,

@@ -394,6 +394,7 @@ export default function LogsheetDetail() {
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 
   const refNumber =
+    logsheet.logsheet_number ||
     logsheet.application_number ||
     logsheet.application_id?.application_number ||
     logsheet.addon_application_id?.application_number ||
@@ -488,6 +489,7 @@ export default function LogsheetDetail() {
           {[
             { label: 'Ref No.', value: refNumber, isRef: true },
             { label: 'Company Name', value: logsheet.company_name || appDetails?.client_id?.company_name || '—' },
+            { label: 'Site Name', value: logsheet.site_name || appDetails?.site_name || (typeof logsheet.site_id === 'object' ? logsheet.site_id?.name : null) || '—' },
             { label: 'Company Address', value: logsheet.company_address || appDetails?.establishment_address || '—' },
             { label: 'Manufacturing Address', value: logsheet.manufacturing_address || appDetails?.site_id?.address || '—' },
             { label: 'Contact Person', value: logsheet.contact_person || appDetails?.contact_name || '—' },

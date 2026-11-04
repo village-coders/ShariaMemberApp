@@ -1,12 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
-import { ChevronRight, FileText, Package, CheckCircle, PenTool } from 'lucide-react';
+import { ChevronRight, FileText, Package, CheckCircle, PenTool, MapPin } from 'lucide-react';
 import { getFileUrl } from '../api/client';
 
 export default function LogsheetListItem({ logsheet }) {
   const navigate = useNavigate();
   const company = logsheet.company_name || 'Unknown Company';
+  const siteName = logsheet.site_name || (typeof logsheet.site_id === 'object' ? logsheet.site_id?.name : null) || logsheet.application_id?.site_name;
   const date = (logsheet.created_at || logsheet.createdAt)
     ? new Date(logsheet.created_at || logsheet.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—';
@@ -15,6 +16,7 @@ export default function LogsheetListItem({ logsheet }) {
 
   const refNumber =
     logsheet.logsheet_number ||
+    logsheet.application_number ||
     logsheet.application_id?.application_number ||
     logsheet.addon_application_id?.application_number ||
     logsheet.applications?.application_number ||
@@ -84,6 +86,23 @@ export default function LogsheetListItem({ logsheet }) {
               </span>
             )}
           </div>
+
+          {siteName && siteName.toLowerCase() !== company.toLowerCase() && (
+            <div style={{
+              fontSize: 11.5,
+              color: 'var(--text-2)',
+              marginBottom: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              <MapPin size={12} color="var(--text-3)" style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{siteName}</span>
+            </div>
+          )}
 
           {/* Type Badge & Date */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
