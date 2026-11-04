@@ -87,7 +87,7 @@ export default function LogsheetListItem({ logsheet }) {
             )}
           </div>
 
-          {siteName && siteName.toLowerCase() !== company.toLowerCase() && (
+          {siteName && (
             <div style={{
               fontSize: 11.5,
               color: 'var(--text-2)',
