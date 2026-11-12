@@ -85,6 +85,7 @@ export default function ManageLogsheets() {
         const contact = (l.contact_person || l.client_id?.full_name || '').toLowerCase();
         const auditType = (l.audit_type || '').toLowerCase();
         const category = (l.product_category || '').toLowerCase();
+        const comment = (l.comment || '').toLowerCase();
         return (
           logsheetNo.includes(term) ||
           refNo.includes(term) ||
@@ -92,7 +93,8 @@ export default function ManageLogsheets() {
           site.includes(term) ||
           contact.includes(term) ||
           auditType.includes(term) ||
-          category.includes(term)
+          category.includes(term) ||
+          comment.includes(term)
         );
       }
 

@@ -13,7 +13,8 @@ import {
   ChevronRight,
   ExternalLink,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MessageSquare
 } from 'lucide-react';
 import LoadingState from '../components/LoadingState';
 import Toast from '../components/Toast';
@@ -50,6 +51,7 @@ export default function LogsheetDetail() {
   const [showSignModal, setShowSignModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState('mufti');
   const [submitting, setSubmitting] = useState(false);
+  const [signComment, setSignComment] = useState('');
   const [mySig, setMySig] = useState(null);
   const [toast, setToast] = useState(null);
   const showToast = (message, type = 'info') => setToast({ message, type });
@@ -179,6 +181,7 @@ export default function LogsheetDetail() {
     if (!activeSig && user) {
       refreshSignature(user);
     }
+    setSignComment(logsheet?.comment || '');
     setShowSignModal(true);
   };
 
@@ -194,10 +197,12 @@ export default function LogsheetDetail() {
     setSubmitting(true);
     try {
       const signerName = activeSig.name || user?.full_name || user?.username || 'Authorized Signatory';
-      const res = await signLogsheet(logsheet._id || logsheet.id, selectedRole, activeSig.signature_url, signerName, '');
+      const res = await signLogsheet(logsheet._id || logsheet.id, selectedRole, activeSig.signature_url, signerName, signComment.trim());
       const updated = res?.data || res;
       if (updated && updated._id) {
         setLogsheet(updated);
+      } else {
+        setLogsheet(prev => ({ ...prev, comment: signComment.trim() || prev?.comment }));
       }
       setShowSignModal(false);
       showToast('Logsheet signed successfully! ✓', 'success');
@@ -572,6 +577,31 @@ export default function LogsheetDetail() {
           })}
         </div>
 
+        {/* Comments & Observations */}
+        <p className="section-heading" style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <MessageSquare size={16} /> Comments & Observations
+        </p>
+        <div className="card" style={{ padding: '14px 16px' }}>
+          {logsheet.comment ? (
+            <div style={{
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: 'var(--text-1)',
+              whiteSpace: 'pre-wrap',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '12px 14px'
+            }}>
+              {logsheet.comment}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic', padding: '4px 0' }}>
+              No comments or observations recorded for this logsheet.
+            </div>
+          )}
+        </div>
+
         {/* All Logsheet & Application Documents */}
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -869,7 +899,7 @@ export default function LogsheetDetail() {
                 </div>
 
                 <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10 }}>Select your role</p>
-                <div className="chip-group" style={{ marginBottom: 20 }}>
+                <div className="chip-group" style={{ marginBottom: 16 }}>
                   {ROLES.map(r => {
                     const alreadySigned = isRoleSigned(r.value);
                     return (
@@ -885,6 +915,27 @@ export default function LogsheetDetail() {
                       </button>
                     );
                   })}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
+                    Comments / Remarks <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>(Optional)</span>
+                  </label>
+                  <textarea
+                    className="form-control"
+                    value={signComment}
+                    onChange={(e) => setSignComment(e.target.value)}
+                    placeholder="Add any remarks or observations for this logsheet..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      fontSize: 13,
+                      resize: 'vertical',
+                      boxSizing: 'border-box'
+                    }}
+                  />
                 </div>
 
                 <div className="modal-actions">

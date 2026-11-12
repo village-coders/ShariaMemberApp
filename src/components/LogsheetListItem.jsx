@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
-import { ChevronRight, FileText, Package, CheckCircle, PenTool, MapPin } from 'lucide-react';
+import { ChevronRight, FileText, Package, CheckCircle, PenTool, MapPin, MessageSquare } from 'lucide-react';
 import { getFileUrl } from '../api/client';
 
 export default function LogsheetListItem({ logsheet }) {
@@ -123,6 +123,33 @@ export default function LogsheetListItem({ logsheet }) {
           </div>
 
           <StatusBadge status={logsheet.status} />
+
+          {logsheet.comment && (
+            <div style={{
+              fontSize: 11.5,
+              color: 'var(--text-2)',
+              marginTop: 6,
+              padding: '6px 10px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 6
+            }}>
+              <MessageSquare size={13} color="var(--primary)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                lineHeight: 1.4
+              }}>
+                <strong style={{ color: 'var(--text-1)' }}>Comment:</strong> {logsheet.comment}
+              </span>
+            </div>
+          )}
         </div>
         <ChevronRight size={18} color="var(--text-3)" style={{ flexShrink: 0 }} />
       </div>
