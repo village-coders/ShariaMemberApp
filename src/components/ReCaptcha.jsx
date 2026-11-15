@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 
 const DEFAULT_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LezIiIuAAAAAD9fjVwvFUVLe7UsKmJq3zjL1mqF';
 
-export default function ReCaptcha({
+function ReCaptchaComponent({
   siteKey = DEFAULT_SITE_KEY,
   onChange,
   onExpired,
@@ -11,44 +11,68 @@ export default function ReCaptcha({
 }) {
   const containerRef = useRef(null);
   const widgetIdRef = useRef(null);
+  const renderedRef = useRef(false);
+
+  // Keep latest callbacks in refs so parent re-renders never destroy/re-render the reCAPTCHA iframe
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const onExpiredRef = useRef(onExpired);
+  onExpiredRef.current = onExpired;
+
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     let isMounted = true;
 
     const renderWidget = () => {
-      if (!isMounted || !containerRef.current || !window.grecaptcha || widgetIdRef.current !== null) {
+      if (!isMounted || !containerRef.current || !window.grecaptcha || renderedRef.current) {
         return;
       }
 
       window.grecaptcha.ready(() => {
-        if (!isMounted || !containerRef.current || widgetIdRef.current !== null) return;
+        if (!isMounted || !containerRef.current || renderedRef.current) return;
         try {
-          // Clear any stale nodes
-          containerRef.current.innerHTML = '';
+          if (containerRef.current.hasChildNodes()) {
+            return;
+          }
+
           const id = window.grecaptcha.render(containerRef.current, {
             sitekey: siteKey,
             theme: 'light',
             callback: (token) => {
-              if (isMounted && onChange) onChange(token);
+              onChangeRef.current?.(token);
             },
             'expired-callback': () => {
-              if (isMounted && onExpired) onExpired();
+              onExpiredRef.current?.();
             },
             'error-callback': () => {
-              if (isMounted && onError) onError();
+              onErrorRef.current?.();
             }
           });
+
           widgetIdRef.current = id;
+          renderedRef.current = true;
+
           if (widgetRef) {
             widgetRef.current = {
               reset: () => {
                 if (window.grecaptcha && widgetIdRef.current !== null) {
-                  window.grecaptcha.reset(widgetIdRef.current);
+                  try {
+                    window.grecaptcha.reset(widgetIdRef.current);
+                  } catch (e) {
+                    console.warn('[reCAPTCHA] reset notice:', e);
+                  }
                 }
               },
               getResponse: () => {
                 if (window.grecaptcha && widgetIdRef.current !== null) {
-                  return window.grecaptcha.getResponse(widgetIdRef.current);
+                  try {
+                    return window.grecaptcha.getResponse(widgetIdRef.current);
+                  } catch (e) {
+                    return '';
+                  }
                 }
                 return '';
               }
@@ -89,9 +113,8 @@ export default function ReCaptcha({
 
     return () => {
       isMounted = false;
-      widgetIdRef.current = null;
     };
-  }, [siteKey, onChange, onExpired, onError, widgetRef]);
+  }, [siteKey, widgetRef]);
 
   return (
     <div
@@ -109,3 +132,4 @@ export default function ReCaptcha({
   );
 }
 
+export default memo(ReCaptchaComponent);

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { login } from '../api/auth';
@@ -14,6 +14,15 @@ export default function Login() {
   const recaptchaRef = useRef(null);
   const { login: setAuth } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  const handleRecaptchaChange = useCallback((token) => {
+    setRecaptchaToken(token || '');
+    setError((prev) => (prev && prev.includes('reCAPTCHA') ? '' : prev));
+  }, []);
+
+  const handleRecaptchaExpired = useCallback(() => {
+    setRecaptchaToken('');
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,11 +92,8 @@ export default function Login() {
 
           <ReCaptcha
             widgetRef={recaptchaRef}
-            onChange={(token) => {
-              setRecaptchaToken(token);
-              if (error.includes('reCAPTCHA')) setError('');
-            }}
-            onExpired={() => setRecaptchaToken('')}
+            onChange={handleRecaptchaChange}
+            onExpired={handleRecaptchaExpired}
           />
 
           <button
