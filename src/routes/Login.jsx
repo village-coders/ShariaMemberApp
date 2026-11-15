@@ -1,31 +1,42 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { login } from '../api/auth';
+import ReCaptcha from '../components/ReCaptcha';
 import hfaLogo from '../assets/hfa-logo.png';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [recaptchaToken, setRecaptchaToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const recaptchaRef = useRef(null);
   const { login: setAuth } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!recaptchaToken) {
+      setError('Please complete the reCAPTCHA verification.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const res = await login(username, password);
+      const res = await login(username, password, recaptchaToken);
       if (res.token && res.user) {
         setAuth(res.user, res.token);
         navigate('/');
       } else {
         setError('Login failed. Please try again.');
+        recaptchaRef.current?.reset();
+        setRecaptchaToken('');
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Login failed');
+      recaptchaRef.current?.reset();
+      setRecaptchaToken('');
     } finally {
       setLoading(false);
     }
@@ -69,7 +80,26 @@ export default function Login() {
               autoComplete="current-password"
             />
           </div>
-          <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: '8px' }}>
+
+          <ReCaptcha
+            widgetRef={recaptchaRef}
+            onChange={(token) => {
+              setRecaptchaToken(token);
+              if (error.includes('reCAPTCHA')) setError('');
+            }}
+            onExpired={() => setRecaptchaToken('')}
+          />
+
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={loading || !recaptchaToken}
+            style={{
+              marginTop: '8px',
+              opacity: (!recaptchaToken || loading) ? 0.7 : 1,
+              cursor: (!recaptchaToken || loading) ? 'not-allowed' : 'pointer'
+            }}
+          >
             {loading ? <span className="spinner" /> : 'Sign In'}
           </button>
         </form>
