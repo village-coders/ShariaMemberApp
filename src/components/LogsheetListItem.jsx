@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
 import { ChevronRight, FileText, Package, CheckCircle, PenTool, MapPin, MessageSquare } from 'lucide-react';
 import { getFileUrl } from '../api/client';
+import { isKfcLogsheet } from '../api/logsheets';
 
 export default function LogsheetListItem({ logsheet }) {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ export default function LogsheetListItem({ logsheet }) {
     ? new Date(logsheet.created_at || logsheet.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—';
 
-  const isKfc = Boolean(logsheet.is_kfc) || logsheet.source_type === 'kfc' || logsheet.logsheet_type === 'kfc' || (logsheet.certificate_standard || '').toUpperCase().includes('KFC') || (logsheet.company_name || '').toUpperCase().includes('KFC');
+  const isKfc = isKfcLogsheet(logsheet);
   const isAddon = !isKfc && (logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(logsheet.product_approval_form));
 
   const refNumber =

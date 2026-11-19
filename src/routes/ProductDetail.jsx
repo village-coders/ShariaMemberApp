@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
-import { getLogsheetById, getAddOnById, getApplicationById } from '../api/logsheets';
+import { getLogsheetById, getAddOnById, getApplicationById, isKfcLogsheet } from '../api/logsheets';
 import { API_BASE, getFileUrl } from '../api/client';
 import {
   ArrowLeft,
@@ -307,18 +307,14 @@ export default function ProductDetail() {
     );
   }
 
-  const isKfcLogsheet = Boolean(logsheet?.is_kfc) ||
-    logsheet?.source_type === 'kfc' ||
-    logsheet?.logsheet_type === 'kfc' ||
-    (logsheet?.certificate_standard || '').toUpperCase().includes('KFC') ||
-    (logsheet?.company_name || '').toUpperCase().includes('KFC');
+  const isKfcLogsheetDoc = isKfcLogsheet(logsheet);
 
   const kfcProducts = Array.isArray(logsheet?.products_list) && logsheet.products_list.length > 0
     ? logsheet.products_list.map((p, idx) => ({
         name: p.name || `Product #${idx + 1}`,
         code: p.code || p.barcode || '',
         category: p.category || '',
-        type: p.product_type || (isKfcLogsheet ? 'KFC Product' : 'Product'),
+        type: p.product_type || (isKfcLogsheetDoc ? 'KFC Product' : 'Product'),
         ingredients: p.ingredients,
         e_numbers: p.e_numbers,
         halal_status: p.halal_status,
@@ -366,7 +362,7 @@ export default function ProductDetail() {
   }
 
   const isKfcProduct = Boolean(product?.isKfcProduct) ||
-    isKfcLogsheet ||
+    isKfcLogsheetDoc ||
     Boolean(product?.ingredients || product?.e_numbers || product?.halal_status);
 
   const prodName = typeof product === 'string' ? product : (product.name || product.product_name || 'Unnamed Product');

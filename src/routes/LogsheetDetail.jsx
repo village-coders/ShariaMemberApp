@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
-import { getLogsheetById, getApplicationById, getAddOnById, signLogsheet } from '../api/logsheets';
+import { getLogsheetById, getApplicationById, getAddOnById, signLogsheet, isKfcLogsheet } from '../api/logsheets';
 import { API_BASE, getFileUrl } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import {
@@ -164,11 +164,7 @@ export default function LogsheetDetail() {
   const isCompleted = logsheet.status?.includes('Waiting For Certificate') || logsheet.status?.includes('Completed');
   const totalSigned = [logsheet.mufti_signature, logsheet.mufti2_signature, logsheet.manager_signature, logsheet.ceo_signature].filter(Boolean).length;
 
-  const isKfc = Boolean(logsheet?.is_kfc) ||
-    logsheet?.source_type === 'kfc' ||
-    logsheet?.logsheet_type === 'kfc' ||
-    (logsheet?.certificate_standard || '').toUpperCase().includes('KFC') ||
-    (logsheet?.company_name || '').toUpperCase().includes('KFC');
+  const isKfc = isKfcLogsheet(logsheet);
 
   const isRoleSigned = (roleVal) => {
     if (!logsheet) return false;
