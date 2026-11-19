@@ -47,6 +47,11 @@ export default function ManageLogsheets() {
   // Client-side search and status refinement
   const filteredLogsheets = useMemo(() => {
     return logsheets.filter(l => {
+      const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
+      if (['draft', 'bin', 'deleted', 'archived'].some(s => statusLower.includes(s))) {
+        return false;
+      }
+
       const isExt = isExtensionLogsheet(l);
 
       // 1. Status match (if not already filtered by backend)
@@ -54,7 +59,6 @@ export default function ManageLogsheets() {
         if (selectedStatus === 'extension') {
           if (!isExt) return false;
         } else {
-          const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
           if (selectedStatus === 'waiting') {
             const isWaiting = statusLower.includes('waiting for signature');
             const isExtWaiting = isExt && !['completed', 'done', 'approved', 'signed'].some(s => statusLower === s);

@@ -26,8 +26,8 @@ export default function NewLogsheets() {
         const newSheets = all.filter(l => {
           const isExt = isExtensionLogsheet(l);
           const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
-          const isNotBin = !['bin', 'deleted', 'archived'].some(s => statusLower.includes(s));
-          if (!isNotBin) return false;
+          const isNotHidden = !['bin', 'deleted', 'archived', 'draft'].some(s => statusLower.includes(s));
+          if (!isNotHidden) return false;
 
           if (isExt) {
             const isDoneStatus = ['completed', 'done', 'approved', 'signed'].some(s => statusLower === s || statusLower.includes('completed') || statusLower.includes('done'));
