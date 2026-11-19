@@ -12,7 +12,7 @@ export const getLogsheets = (params = {}) => {
   return apiClient(`/application-logsheets${qs ? `?${qs}` : ''}`);
 };
 
-export const getLogsheetById = (id) => apiClient(`/application-logsheets/application/${id}`);
+export const getLogsheetById = (id) => apiClient(`/application-logsheets/${id}`);
 
 export const signLogsheet = (id, role, signature_url, signature_name, comment) => apiClient(`/application-logsheets/${id}/sign`, {
   method: 'PUT',

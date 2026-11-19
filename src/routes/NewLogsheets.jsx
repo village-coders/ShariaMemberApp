@@ -61,6 +61,7 @@ export default function NewLogsheets() {
       const auditType = (l.audit_type || '').toLowerCase();
       const category = (l.product_category || '').toLowerCase();
       const comment = (l.comment || '').toLowerCase();
+      const isKfcMatch = Boolean(l.is_kfc) || l.source_type === 'kfc' || l.logsheet_type === 'kfc' || (l.certificate_standard || '').toUpperCase().includes('KFC');
       return (
         logsheetNo.includes(term) ||
         refNo.includes(term) ||
@@ -69,7 +70,8 @@ export default function NewLogsheets() {
         contact.includes(term) ||
         auditType.includes(term) ||
         category.includes(term) ||
-        comment.includes(term)
+        comment.includes(term) ||
+        (isKfcMatch && term.includes('kfc'))
       );
     });
   }, [logsheets, searchTerm]);

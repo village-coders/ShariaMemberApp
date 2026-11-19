@@ -12,7 +12,8 @@ export default function LogsheetListItem({ logsheet }) {
     ? new Date(logsheet.created_at || logsheet.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—';
 
-  const isAddon = logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(logsheet.product_approval_form);
+  const isKfc = Boolean(logsheet.is_kfc) || logsheet.source_type === 'kfc' || logsheet.logsheet_type === 'kfc' || (logsheet.certificate_standard || '').toUpperCase().includes('KFC') || (logsheet.company_name || '').toUpperCase().includes('KFC');
+  const isAddon = !isKfc && (logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(logsheet.product_approval_form));
 
   const refNumber =
     logsheet.logsheet_number ||
@@ -44,7 +45,7 @@ export default function LogsheetListItem({ logsheet }) {
         flexDirection: 'column',
         gap: 10,
         padding: '14px 16px',
-        border: isAddon ? '1.5px solid #c7d2fe' : '1px solid var(--border)',
+        border: isKfc ? '1.5px solid #fca5a5' : (isAddon ? '1.5px solid #c7d2fe' : '1px solid var(--border)'),
         boxShadow: 'var(--shadow-xs)'
       }}
     >
@@ -53,13 +54,15 @@ export default function LogsheetListItem({ logsheet }) {
           width: 44,
           height: 44,
           borderRadius: 12,
-          background: isAddon ? '#eff6ff' : 'var(--primary-subtle)',
+          background: isKfc ? '#fef2f2' : (isAddon ? '#eff6ff' : 'var(--primary-subtle)'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0
         }}>
-          {isAddon ? (
+          {isKfc ? (
+            <span style={{ fontSize: 22 }} role="img" aria-label="KFC">🍗</span>
+          ) : isAddon ? (
             <Package size={22} color="#2563eb" />
           ) : (
             <FileText size={22} color="var(--primary)" />
@@ -111,13 +114,13 @@ export default function LogsheetListItem({ logsheet }) {
               fontWeight: 700,
               padding: '2px 8px',
               borderRadius: 6,
-              background: isAddon ? '#e0e7ff' : '#ecfdf5',
-              color: isAddon ? '#3730a3' : '#065f46',
+              background: isKfc ? '#fee2e2' : (isAddon ? '#e0e7ff' : '#ecfdf5'),
+              color: isKfc ? '#b91c1c' : (isAddon ? '#3730a3' : '#065f46'),
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4
             }}>
-              {isAddon ? '📦 Product Add-on' : '📋 Application'}
+              {isKfc ? '🍗 KFC Logsheet' : (isAddon ? '📦 Product Add-on' : '📋 Application')}
             </span>
             <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>&middot; {date}</span>
           </div>
