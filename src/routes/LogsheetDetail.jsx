@@ -67,21 +67,19 @@ export default function LogsheetDetail() {
     }
   }, []);
 
-  // 1. Fetch Logsheet (hydrates full logsheet including products_list and document_urls)
+  // 1. Fetch Logsheet if not in state
   useEffect(() => {
-    if (id) {
-      if (!logsheet) setLoadingLogsheet(true);
+    if (!logsheet && id) {
+      setLoadingLogsheet(true);
       getLogsheetById(id)
         .then(res => {
-          const ls = res?.data || res;
-          if (ls && (ls._id || ls.id)) {
-            setLogsheet(ls);
-          }
+          const ls = res.data || res;
+          setLogsheet(ls);
         })
         .catch(err => console.error('Failed to load logsheet', err))
         .finally(() => setLoadingLogsheet(false));
     }
-  }, [id]);
+  }, [id, logsheet]);
 
   // 2. Fetch associated Application or AddOn Application details
   useEffect(() => {
@@ -164,12 +162,6 @@ export default function LogsheetDetail() {
   const isCompleted = logsheet.status?.includes('Waiting For Certificate') || logsheet.status?.includes('Completed');
   const totalSigned = [logsheet.mufti_signature, logsheet.mufti2_signature, logsheet.manager_signature, logsheet.ceo_signature].filter(Boolean).length;
 
-  const isKfc = Boolean(logsheet?.is_kfc) ||
-    logsheet?.source_type === 'kfc' ||
-    logsheet?.logsheet_type === 'kfc' ||
-    (logsheet?.certificate_standard || '').toUpperCase().includes('KFC') ||
-    (logsheet?.company_name || '').toUpperCase().includes('KFC');
-
   const isRoleSigned = (roleVal) => {
     if (!logsheet) return false;
     if (roleVal === 'mufti') return Boolean(logsheet.mufti_signature);
@@ -224,22 +216,6 @@ export default function LogsheetDetail() {
   };
 
   // Extract products from all potential places
-  const kfcProducts = Array.isArray(logsheet?.products_list) && logsheet.products_list.length > 0
-    ? logsheet.products_list.map((p, idx) => ({
-        name: p.name || `Product #${idx + 1}`,
-        code: p.code || p.barcode || '',
-        category: p.category || '',
-        type: p.product_type || (isKfc ? 'KFC Product' : 'Product'),
-        ingredients: p.ingredients,
-        e_numbers: p.e_numbers,
-        halal_status: p.halal_status,
-        barcode: p.barcode,
-        sn: idx + 1,
-        isKfcProduct: isKfc || Boolean(p.halal_status || p.ingredients || p.e_numbers),
-        ...p
-      }))
-    : [];
-
   const rawAddonProducts = Array.isArray(appDetails?.products) && appDetails.products.length > 0 ? appDetails.products : [];
   const certProducts = Array.isArray(appDetails?.certificate_id?.products_covered)
     ? appDetails.certificate_id.products_covered.map(p => typeof p === 'string' ? { name: p, isExisting: true } : p)
@@ -250,9 +226,7 @@ export default function LogsheetDetail() {
     ? appDetails.product_approval_form.product_responses
     : (Array.isArray(logsheet?.product_approval_form?.product_responses) ? logsheet.product_approval_form.product_responses : []);
 
-  let allProductItems = kfcProducts.length > 0
-    ? kfcProducts
-    : (rawAddonProducts.length > 0 ? rawAddonProducts : [...legacyProduct, ...certProducts]);
+  let allProductItems = rawAddonProducts.length > 0 ? rawAddonProducts : [...legacyProduct, ...certProducts];
 
   // If no explicit product array exists but client submitted product responses, construct products list
   if (allProductItems.length === 0 && formResponses.length > 0) {
@@ -270,9 +244,8 @@ export default function LogsheetDetail() {
     if (parsedNames.length > 0) {
       allProductItems = parsedNames.map((name, i) => ({
         name,
-        type: isKfc ? 'KFC Product' : 'Product',
-        sn: i + 1,
-        isKfcProduct: isKfc
+        type: 'Product',
+        sn: i + 1
       }));
     }
   }
@@ -478,26 +451,9 @@ export default function LogsheetDetail() {
                 {logsheet.company_name || appDetails?.client_id?.company_name || 'Applicant Company'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {isKfc ? (
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: '#b91c1c',
-                    background: '#fee2e2',
-                    border: '1px solid #fca5a5',
-                    padding: '2px 8px',
-                    borderRadius: 6,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4
-                  }}>
-                    🍗 KFC Logsheet
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
-                    {logsheet.audit_type || (isAddon ? 'Add-on Application' : 'Halal Audit')}
-                  </span>
-                )}
+                <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                  {logsheet.audit_type || (isAddon ? 'Add-on Application' : 'Halal Audit')}
+                </span>
                 {refNumber && refNumber !== '—' && (
                   <>
                     <span style={{ color: 'var(--text-3)', fontSize: 12 }}>•</span>
@@ -728,7 +684,7 @@ export default function LogsheetDetail() {
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <p className="section-heading" style={{ margin: 0 }}>
-              {isKfc ? `🍗 KFC Menu & Halal Products (${allProductItems.length})` : `Assigned Products & Approval Forms (${allProductItems.length})`}
+              Assigned Products & Approval Forms ({allProductItems.length})
             </p>
           </div>
 
@@ -738,7 +694,7 @@ export default function LogsheetDetail() {
             <div className="card" style={{ padding: 16, textAlign: 'center' }}>
               <Package size={22} color="var(--text-3)" style={{ marginBottom: 4 }} />
               <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
-                {isKfc ? 'No KFC products recorded on this logsheet.' : 'No products found for this logsheet.'}
+                No products found for this logsheet.
               </p>
             </div>
           )}
@@ -747,7 +703,7 @@ export default function LogsheetDetail() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {allProductItems.map((prod, idx) => {
                 const prodName = typeof prod === 'string' ? prod : (prod.name || 'Unnamed Product');
-                const prodType = prod.type || (prod.isExisting ? 'Existing Covered' : (prod.isNew ? 'New Product' : (isKfc ? 'KFC Product' : null)));
+                const prodType = prod.type || (prod.isExisting ? 'Existing Covered' : (prod.isNew ? 'New Product' : null));
                 const prodCode = prod.code;
                 const sn = prod.sn || (idx + 1);
 
@@ -768,13 +724,13 @@ export default function LogsheetDetail() {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: 12,
-                      border: isKfc ? '1px solid #fca5a5' : (hasResp ? '1.5px solid var(--primary-border)' : '1px solid var(--border)'),
+                      border: hasResp ? '1.5px solid var(--primary-border)' : '1px solid var(--border)',
                       boxShadow: 'var(--shadow-xs)'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 10, background: isKfc ? '#fef2f2' : 'var(--primary-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {isKfc ? <span style={{ fontSize: 20 }}>🍗</span> : <Package size={20} color="var(--primary)" />}
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Package size={20} color="var(--primary)" />
                       </div>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -786,32 +742,18 @@ export default function LogsheetDetail() {
                               Code: {prodCode}
                             </span>
                           )}
-                          {prod.barcode && prod.barcode !== prodCode && (
-                            <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg)', padding: '1px 6px', borderRadius: 4 }}>
-                              Barcode: {prod.barcode}
-                            </span>
-                          )}
                           {prodType && (
-                            <span style={{ fontSize: 11, fontWeight: 600, color: isKfc ? '#b91c1c' : 'var(--primary)', background: isKfc ? '#fee2e2' : 'var(--primary-subtle)', padding: '1px 6px', borderRadius: 4 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-subtle)', padding: '1px 6px', borderRadius: 4 }}>
                               {prodType}
-                            </span>
-                          )}
-                          {prod.halal_status && (
-                            <span style={{ fontSize: 11, color: '#047857', background: '#d1fae5', padding: '1px 6px', borderRadius: 4, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                              <CheckCircle2 size={11} /> {prod.halal_status}
                             </span>
                           )}
                           {hasResp ? (
                             <span style={{ fontSize: 11, color: 'var(--status-done-text)', background: 'var(--status-done-bg)', padding: '1px 6px', borderRadius: 4, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                               <CheckCircle2 size={11} /> Filled Form
                             </span>
-                          ) : !isKfc ? (
-                            <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
-                              Tap to view form
-                            </span>
                           ) : (
                             <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
-                              Tap to view details
+                              Tap to view form
                             </span>
                           )}
                         </div>
@@ -819,10 +761,8 @@ export default function LogsheetDetail() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      <span style={{ fontSize: 12, color: isKfc ? '#b91c1c' : 'var(--primary)', fontWeight: 600 }}>
-                        {isKfc ? 'View Details' : 'View Form'}
-                      </span>
-                      <ChevronRight size={18} color={isKfc ? '#b91c1c' : 'var(--primary)'} />
+                      <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>View Form</span>
+                      <ChevronRight size={18} color="var(--primary)" />
                     </div>
                   </div>
                 );

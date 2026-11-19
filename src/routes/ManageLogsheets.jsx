@@ -11,7 +11,6 @@ const PAGE_SIZE = 10;
 const STATUS_FILTERS = [
   { label: 'All', value: 'all' },
   { label: 'Waiting Signature', value: 'waiting' },
-  { label: '🍗 KFC Logsheets', value: 'kfc' },
   { label: 'Signed', value: 'signed' },
   { label: 'Completed', value: 'completed' },
 ];
@@ -33,24 +32,11 @@ export default function ManageLogsheets() {
       params.status = 'Signed,signed';
     } else if (selectedStatus === 'completed') {
       params.status = 'Completed,completed';
-    } else if (selectedStatus === 'kfc') {
-      params.source_type = 'kfc';
     }
 
     getLogsheets(params)
       .then(res => {
-        let list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-        if (selectedStatus === 'kfc' && list.length === 0) {
-          // If backend filter by source_type=kfc returned empty due to different field mapping, fallback to full list
-          getLogsheets({})
-            .then(allRes => {
-              const allList = Array.isArray(allRes?.data) ? allRes.data : (Array.isArray(allRes) ? allRes : []);
-              const kfcOnly = allList.filter(l => Boolean(l.is_kfc) || l.source_type === 'kfc' || l.logsheet_type === 'kfc' || (l.certificate_standard || '').toUpperCase().includes('KFC') || (l.company_name || '').toUpperCase().includes('KFC'));
-              setLogsheets(kfcOnly);
-            })
-            .catch(() => setLogsheets([]));
-          return;
-        }
+        const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
         setLogsheets(list);
       })
       .catch(console.error)
@@ -60,23 +46,17 @@ export default function ManageLogsheets() {
   // Client-side search and status refinement
   const filteredLogsheets = useMemo(() => {
     return logsheets.filter(l => {
-      const isKfcLogsheet = Boolean(l.is_kfc) || l.source_type === 'kfc' || l.logsheet_type === 'kfc' || (l.certificate_standard || '').toUpperCase().includes('KFC') || (l.company_name || '').toUpperCase().includes('KFC');
-
       // 1. Status match (if not already filtered by backend)
       if (selectedStatus !== 'all') {
-        if (selectedStatus === 'kfc') {
-          if (!isKfcLogsheet) return false;
-        } else {
-          const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
-          if (selectedStatus === 'waiting' && !statusLower.includes('waiting for signature')) {
-            return false;
-          }
-          if (selectedStatus === 'signed' && !statusLower.includes('signed')) {
-            return false;
-          }
-          if (selectedStatus === 'completed' && !statusLower.includes('completed')) {
-            return false;
-          }
+        const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
+        if (selectedStatus === 'waiting' && !statusLower.includes('waiting for signature')) {
+          return false;
+        }
+        if (selectedStatus === 'signed' && !statusLower.includes('signed')) {
+          return false;
+        }
+        if (selectedStatus === 'completed' && !statusLower.includes('completed')) {
+          return false;
         }
       }
 
@@ -114,8 +94,7 @@ export default function ManageLogsheets() {
           contact.includes(term) ||
           auditType.includes(term) ||
           category.includes(term) ||
-          comment.includes(term) ||
-          (isKfcLogsheet && term.includes('kfc'))
+          comment.includes(term)
         );
       }
 

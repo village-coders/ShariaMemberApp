@@ -296,7 +296,7 @@ export default function ProductDetail() {
   }, [id, appData]);
 
   if (loading) return <LoadingState />;
-  if (!appData && !state?.product && !logsheet) {
+  if (!appData && !state?.product) {
     return (
       <div style={{ padding: 16 }}>
         <button className="btn btn-secondary" onClick={() => navigate(-1)} style={{ width: 'auto', padding: '10px 18px' }}>
@@ -306,28 +306,6 @@ export default function ProductDetail() {
       </div>
     );
   }
-
-  const isKfcLogsheet = Boolean(logsheet?.is_kfc) ||
-    logsheet?.source_type === 'kfc' ||
-    logsheet?.logsheet_type === 'kfc' ||
-    (logsheet?.certificate_standard || '').toUpperCase().includes('KFC') ||
-    (logsheet?.company_name || '').toUpperCase().includes('KFC');
-
-  const kfcProducts = Array.isArray(logsheet?.products_list) && logsheet.products_list.length > 0
-    ? logsheet.products_list.map((p, idx) => ({
-        name: p.name || `Product #${idx + 1}`,
-        code: p.code || p.barcode || '',
-        category: p.category || '',
-        type: p.product_type || (isKfcLogsheet ? 'KFC Product' : 'Product'),
-        ingredients: p.ingredients,
-        e_numbers: p.e_numbers,
-        halal_status: p.halal_status,
-        barcode: p.barcode,
-        sn: idx + 1,
-        isKfcProduct: true,
-        ...p
-      }))
-    : [];
 
   const addOnProducts = Array.isArray(appData?.products) && appData.products.length > 0 ? appData.products : [];
   const certProducts = Array.isArray(appData?.certificate_id?.products_covered)
@@ -339,10 +317,7 @@ export default function ProductDetail() {
     ? appData.product_approval_form.product_responses
     : (Array.isArray(logsheet?.product_approval_form?.product_responses) ? logsheet.product_approval_form.product_responses : []);
 
-  let allProductItems = kfcProducts.length > 0
-    ? kfcProducts
-    : (addOnProducts.length > 0 ? addOnProducts : [...legacyProduct, ...certProducts]);
-
+  let allProductItems = addOnProducts.length > 0 ? addOnProducts : [...legacyProduct, ...certProducts];
   if (allProductItems.length === 0 && responsesList.length > 0) {
     allProductItems = responsesList.map((r, i) => ({
       name: r.product_name || `Product #${r.product_index !== undefined ? r.product_index + 1 : i + 1}`,
@@ -365,12 +340,8 @@ export default function ProductDetail() {
     );
   }
 
-  const isKfcProduct = Boolean(product?.isKfcProduct) ||
-    isKfcLogsheet ||
-    Boolean(product?.ingredients || product?.e_numbers || product?.halal_status);
-
   const prodName = typeof product === 'string' ? product : (product.name || product.product_name || 'Unnamed Product');
-  const prodType = product.type || (product.isExisting ? 'Existing Covered Product' : (product.isNew ? 'New Product' : (isKfcProduct ? 'KFC Product' : null)));
+  const prodType = product.type || (product.isExisting ? 'Existing Covered Product' : (product.isNew ? 'New Product' : null));
   const prodCode = product.code || product.product_code;
   const sn = product.sn || (indexNum + 1);
 
@@ -380,7 +351,6 @@ export default function ProductDetail() {
 
   const formRequested = appData?.status === 'product_approval_form_enabled' || Boolean(appData?.product_approval_form?.sent_at);
   const companyName = logsheet?.company_name || appData?.client_id?.company_name || appData?.company_name || appData?.establishment_name || 'Company';
-  const displayRef = logsheet?.logsheet_number || logsheet?.direct_ref || logsheet?.kfc_ref || appData?.application_number || logsheet?.application_number;
 
   return (
     <>
@@ -398,19 +368,10 @@ export default function ProductDetail() {
         </div>
 
         {/* Product Hero Card */}
-        <div className="card" style={{ border: isKfcProduct ? '1.5px solid #fca5a5' : undefined }}>
+        <div className="card">
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-            <div style={{
-              width: 42,
-              height: 42,
-              borderRadius: 12,
-              background: isKfcProduct ? '#fef2f2' : 'var(--primary-subtle)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              {isKfcProduct ? <span style={{ fontSize: 22 }}>🍗</span> : <Package size={20} color="var(--primary)" />}
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--primary-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Package size={20} color="var(--primary)" />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
@@ -422,36 +383,9 @@ export default function ProductDetail() {
                     Code: {prodCode}
                   </span>
                 )}
-                {product.barcode && product.barcode !== prodCode && (
-                  <span style={{ fontSize: 12, color: 'var(--text-3)', background: 'var(--bg)', padding: '2px 8px', borderRadius: 6 }}>
-                    Barcode: {product.barcode}
-                  </span>
-                )}
                 {prodType && (
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: isKfcProduct ? '#b91c1c' : 'var(--primary)',
-                    background: isKfcProduct ? '#fee2e2' : 'var(--primary-subtle)',
-                    padding: '2px 8px',
-                    borderRadius: 99
-                  }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-subtle)', padding: '2px 8px', borderRadius: 99 }}>
                     {prodType}
-                  </span>
-                )}
-                {product.halal_status && (
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#047857',
-                    background: '#d1fae5',
-                    padding: '2px 8px',
-                    borderRadius: 99,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 3
-                  }}>
-                    <CheckCircle2 size={11} /> {product.halal_status}
                   </span>
                 )}
               </div>
@@ -461,11 +395,11 @@ export default function ProductDetail() {
 
         {/* Company Info Row */}
         <div className="card" style={{ padding: '4px 16px' }}>
-          {displayRef && (
+          {(appData?.application_number || logsheet?.application_number || logsheet?.application_id?.application_number) && (
             <div className="detail-row">
               <div className="detail-label" style={{ fontWeight: 600 }}>Ref No.</div>
               <div className="detail-value" style={{ fontWeight: 700, fontFamily: 'monospace', color: 'var(--primary)' }}>
-                {displayRef}
+                {appData?.application_number || logsheet?.application_number || logsheet?.application_id?.application_number}
               </div>
             </div>
           )}
@@ -473,104 +407,23 @@ export default function ProductDetail() {
             <div className="detail-label">Company</div>
             <div className="detail-value">{companyName}</div>
           </div>
-          {(logsheet?.status || appData?.status) && (
+          {appData?.status && (
             <div className="detail-row">
               <div className="detail-label">Status</div>
               <div className="detail-value">
-                <StatusBadge status={logsheet?.status || appData?.status} />
+                <StatusBadge status={appData.status} />
               </div>
             </div>
           )}
         </div>
 
-        {/* Client Approval Form / KFC Halal Assessment Section */}
+        {/* Client Approval Form Submission Section */}
         <div style={{ marginTop: 16 }}>
           <p className="section-heading" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isKfcProduct ? <span style={{ fontSize: 16 }}>🍗</span> : <FileText size={16} />}
-            {isKfcProduct ? 'KFC Halal & Ingredient Assessment' : 'Client Filled Approval Form'}
+            <FileText size={16} /> Client Filled Approval Form
           </p>
 
-          {isKfcProduct ? (
-            <div className="card" style={{ padding: '14px 16px', border: '1.5px solid #fca5a5' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid #fee2e2', paddingBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <ShieldCheck size={16} color="#b91c1c" /> HALAL AUDIT VERIFICATION
-                </span>
-                {product.halal_status ? (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    background: '#dcfce7', color: '#15803d', border: '1px solid #86efac',
-                    padding: '3px 10px', borderRadius: 99, fontWeight: 700, fontSize: 12
-                  }}>
-                    <CheckCircle2 size={13} /> {product.halal_status}
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Status: Recorded</span>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {product.category && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--divider)' }}>
-                    <span style={{ color: 'var(--text-3)', fontSize: 12, fontWeight: 600 }}>Category</span>
-                    <span style={{ color: 'var(--text-1)', fontSize: 13, fontWeight: 700 }}>{product.category}</span>
-                  </div>
-                )}
-
-                {product.product_type && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--divider)' }}>
-                    <span style={{ color: 'var(--text-3)', fontSize: 12, fontWeight: 600 }}>Product Type</span>
-                    <span style={{ color: 'var(--text-1)', fontSize: 13, fontWeight: 700 }}>{product.product_type}</span>
-                  </div>
-                )}
-
-                {product.barcode && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--divider)' }}>
-                    <span style={{ color: 'var(--text-3)', fontSize: 12, fontWeight: 600 }}>Barcode / SKU</span>
-                    <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontSize: 13, fontWeight: 700 }}>{product.barcode}</span>
-                  </div>
-                )}
-
-                {product.ingredients ? (
-                  <div style={{ marginTop: 6 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Layers size={15} color="#b91c1c" /> Ingredients / Composition
-                    </div>
-                    <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 13, color: 'var(--text-1)', lineHeight: 1.5 }}>
-                      {product.ingredients}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', padding: '6px 0' }}>
-                    No specific ingredients breakdown recorded for this product.
-                  </div>
-                )}
-
-                {product.e_numbers ? (
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <FlaskConical size={15} color="#b91c1c" /> E-Numbers & Halal Additives
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, background: '#fff1f2', padding: '10px 12px', borderRadius: 10, border: '1px solid #fecdd3' }}>
-                      {product.e_numbers.split(/[,;]+/).map((e, eIdx) => {
-                        const trimmed = e.trim();
-                        if (!trimmed) return null;
-                        return (
-                          <span key={eIdx} style={{ fontSize: 12, fontWeight: 700, color: '#9f1239', background: '#ffe4e6', padding: '4px 10px', borderRadius: 6, border: '1px solid #fbcfe8' }}>
-                            {trimmed}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', padding: '4px 0' }}>
-                    No E-numbers or additives flagged.
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : prodResponse ? (
+          {prodResponse ? (
             <div className="card" style={{ padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid var(--divider)', paddingBottom: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
