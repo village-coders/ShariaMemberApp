@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useMemo } from 'react';
-import { getLogsheets, isKfcLogsheet } from '../api/logsheets';
+import { getLogsheets } from '../api/logsheets';
 import LogsheetListItem from '../components/LogsheetListItem';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
@@ -18,24 +18,14 @@ export default function NewLogsheets() {
 
   useEffect(() => {
     setLoading(true);
-    getLogsheets()
+    // Ask backend specifically for logsheets with Waiting for Signature to optimize payload size
+    getLogsheets({ status: 'Waiting for Signature,waiting for signature,Waiting For Signature,waiting_for_signature,Waiting_For_Signature' })
       .then(res => {
         const all = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
 
         const newSheets = all.filter(l => {
-          const isKfc = isKfcLogsheet(l);
           const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
-          const isNotBin = !['bin', 'deleted', 'archived'].some(s => statusLower.includes(s));
-          if (!isNotBin) return false;
-
-          // If KFC logsheet, show in New unless all 4 signatures are already completed
-          if (isKfc) {
-            const totalSigned = [l.mufti_signature, l.mufti2_signature, l.manager_signature, l.ceo_signature].filter(Boolean).length;
-            const isCompleted = statusLower.includes('completed') || totalSigned === 4;
-            return !isCompleted;
-          }
-
-          return statusLower.includes('waiting for signature') || statusLower.includes('waiting') || !l.status;
+          return statusLower.includes('waiting for signature');
         });
         setLogsheets(newSheets);
       })
@@ -71,7 +61,7 @@ export default function NewLogsheets() {
       const auditType = (l.audit_type || '').toLowerCase();
       const category = (l.product_category || '').toLowerCase();
       const comment = (l.comment || '').toLowerCase();
-      const isKfcMatch = isKfcLogsheet(l);
+      const isKfcMatch = Boolean(l.is_kfc) || l.source_type === 'kfc' || l.logsheet_type === 'kfc' || (l.certificate_standard || '').toUpperCase().includes('KFC');
       return (
         logsheetNo.includes(term) ||
         refNo.includes(term) ||
@@ -81,7 +71,7 @@ export default function NewLogsheets() {
         auditType.includes(term) ||
         category.includes(term) ||
         comment.includes(term) ||
-        (isKfcMatch && (term.includes('kfc') || term.includes('kentucky')))
+        (isKfcMatch && term.includes('kfc'))
       );
     });
   }, [logsheets, searchTerm]);
