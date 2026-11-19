@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { getLogsheets } from '../api/logsheets';
+import { getLogsheets, isExtensionLogsheet } from '../api/logsheets';
 import LogsheetListItem from '../components/LogsheetListItem';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
@@ -11,6 +11,7 @@ const PAGE_SIZE = 10;
 const STATUS_FILTERS = [
   { label: 'All', value: 'all' },
   { label: 'Waiting Signature', value: 'waiting' },
+  { label: '⏳ Extension', value: 'extension' },
   { label: 'Signed', value: 'signed' },
   { label: 'Completed', value: 'completed' },
 ];
@@ -46,17 +47,25 @@ export default function ManageLogsheets() {
   // Client-side search and status refinement
   const filteredLogsheets = useMemo(() => {
     return logsheets.filter(l => {
+      const isExt = isExtensionLogsheet(l);
+
       // 1. Status match (if not already filtered by backend)
       if (selectedStatus !== 'all') {
-        const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
-        if (selectedStatus === 'waiting' && !statusLower.includes('waiting for signature')) {
-          return false;
-        }
-        if (selectedStatus === 'signed' && !statusLower.includes('signed')) {
-          return false;
-        }
-        if (selectedStatus === 'completed' && !statusLower.includes('completed')) {
-          return false;
+        if (selectedStatus === 'extension') {
+          if (!isExt) return false;
+        } else {
+          const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
+          if (selectedStatus === 'waiting') {
+            const isWaiting = statusLower.includes('waiting for signature');
+            const isExtWaiting = isExt && !['completed', 'done', 'approved', 'signed'].some(s => statusLower === s);
+            if (!isWaiting && !isExtWaiting) return false;
+          }
+          if (selectedStatus === 'signed' && !statusLower.includes('signed')) {
+            return false;
+          }
+          if (selectedStatus === 'completed' && !statusLower.includes('completed') && !statusLower.includes('done')) {
+            return false;
+          }
         }
       }
 
@@ -70,7 +79,6 @@ export default function ManageLogsheets() {
           l.addon_application_id?.application_number ||
           l.applications?.application_number ||
           l.direct_ref ||
-          l.kfc_ref ||
           l.legacy_id ||
           (l._id ? `APP-${String(l._id).slice(-6)}` : '')
         ).toLowerCase();
@@ -94,7 +102,8 @@ export default function ManageLogsheets() {
           contact.includes(term) ||
           auditType.includes(term) ||
           category.includes(term) ||
-          comment.includes(term)
+          comment.includes(term) ||
+          (isExt && term.includes('extension'))
         );
       }
 

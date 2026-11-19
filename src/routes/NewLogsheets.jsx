@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useMemo } from 'react';
-import { getLogsheets } from '../api/logsheets';
+import { getLogsheets, isExtensionLogsheet } from '../api/logsheets';
 import LogsheetListItem from '../components/LogsheetListItem';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
@@ -18,13 +18,28 @@ export default function NewLogsheets() {
 
   useEffect(() => {
     setLoading(true);
-    // Ask backend specifically for logsheets with Waiting for Signature to optimize payload size
+    // Ask backend specifically for logsheets with Waiting for Signature (plus direct & extension logsheets)
     getLogsheets({ status: 'Waiting for Signature,waiting for signature,Waiting For Signature,waiting_for_signature,Waiting_For_Signature' })
       .then(res => {
         const all = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
 
         const newSheets = all.filter(l => {
+          const isExt = isExtensionLogsheet(l);
           const statusLower = (l.status || '').toLowerCase().replace(/_/g, ' ').trim();
+          const isNotBin = !['bin', 'deleted', 'archived'].some(s => statusLower.includes(s));
+          if (!isNotBin) return false;
+
+          if (isExt) {
+            const isDoneStatus = ['completed', 'done', 'approved', 'signed'].some(s => statusLower === s || statusLower.includes('completed') || statusLower.includes('done'));
+            if (isDoneStatus) return false;
+            const isSingleSig = l.signatures_required === 1 || l.extension_duration_type === '30_days';
+            if (isSingleSig) {
+              return !l.single_signature;
+            }
+            const totalSigned = [l.mufti_signature, l.mufti2_signature, l.manager_signature, l.ceo_signature].filter(Boolean).length;
+            return totalSigned < 4;
+          }
+
           return statusLower.includes('waiting for signature');
         });
         setLogsheets(newSheets);
@@ -45,7 +60,6 @@ export default function NewLogsheets() {
         l.addon_application_id?.application_number ||
         l.applications?.application_number ||
         l.direct_ref ||
-        l.kfc_ref ||
         l.legacy_id ||
         (l._id ? `APP-${String(l._id).slice(-6)}` : '')
       ).toLowerCase();
@@ -61,6 +75,7 @@ export default function NewLogsheets() {
       const auditType = (l.audit_type || '').toLowerCase();
       const category = (l.product_category || '').toLowerCase();
       const comment = (l.comment || '').toLowerCase();
+      const isExtMatch = isExtensionLogsheet(l);
       return (
         logsheetNo.includes(term) ||
         refNo.includes(term) ||
@@ -69,7 +84,8 @@ export default function NewLogsheets() {
         contact.includes(term) ||
         auditType.includes(term) ||
         category.includes(term) ||
-        comment.includes(term)
+        comment.includes(term) ||
+        (isExtMatch && term.includes('extension'))
       );
     });
   }, [logsheets, searchTerm]);

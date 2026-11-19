@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
 import { ChevronRight, FileText, Package, CheckCircle, PenTool, MapPin, MessageSquare } from 'lucide-react';
 import { getFileUrl } from '../api/client';
+import { isExtensionLogsheet } from '../api/logsheets';
 
 export default function LogsheetListItem({ logsheet }) {
   const navigate = useNavigate();
@@ -12,7 +13,9 @@ export default function LogsheetListItem({ logsheet }) {
     ? new Date(logsheet.created_at || logsheet.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—';
 
-  const isAddon = logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(logsheet.product_approval_form);
+  const isExtension = isExtensionLogsheet(logsheet);
+  const isAddon = !isExtension && (logsheet.source_type === 'addon_application' || Boolean(logsheet.addon_application_id) || Boolean(logsheet.product_approval_form));
+  const isSingleSig = isExtension && (logsheet.signatures_required === 1 || logsheet.extension_duration_type === '30_days');
 
   const refNumber =
     logsheet.logsheet_number ||
@@ -21,17 +24,21 @@ export default function LogsheetListItem({ logsheet }) {
     logsheet.addon_application_id?.application_number ||
     logsheet.applications?.application_number ||
     logsheet.direct_ref ||
-    logsheet.kfc_ref ||
     logsheet.legacy_id ||
     (logsheet._id ? `APP-${String(logsheet._id).slice(-6).toUpperCase()}` : null);
 
-  const signatureRoles = [
-    { label: 'Mufti 1', name: logsheet.mufti_sign_name, signature: logsheet.mufti_signature, date: logsheet.mufti_sign_date },
-    { label: 'Mufti 2', name: logsheet.mufti2_sign_name, signature: logsheet.mufti2_signature, date: logsheet.mufti2_sign_date },
-    { label: 'Manager', name: logsheet.manager_sign_name, signature: logsheet.manager_signature, date: logsheet.manager_sign_date },
-    { label: 'CEO', name: logsheet.ceo_sign_name, signature: logsheet.ceo_signature, date: logsheet.ceo_sign_date },
-  ];
+  const signatureRoles = isSingleSig
+    ? [
+        { label: logsheet.single_sign_role || 'Authorized Officer', name: logsheet.single_sign_name, signature: logsheet.single_signature, date: logsheet.single_sign_date }
+      ]
+    : [
+        { label: 'Mufti 1', name: logsheet.mufti_sign_name, signature: logsheet.mufti_signature, date: logsheet.mufti_sign_date },
+        { label: 'Mufti 2', name: logsheet.mufti2_sign_name, signature: logsheet.mufti2_signature, date: logsheet.mufti2_sign_date },
+        { label: 'Manager', name: logsheet.manager_sign_name, signature: logsheet.manager_signature, date: logsheet.manager_sign_date },
+        { label: 'CEO', name: logsheet.ceo_sign_name, signature: logsheet.ceo_signature, date: logsheet.ceo_sign_date },
+      ];
 
+  const requiredSigCount = isSingleSig ? 1 : 4;
   const signedSignatures = signatureRoles.filter(s => s.name || s.signature);
 
   return (
@@ -44,7 +51,7 @@ export default function LogsheetListItem({ logsheet }) {
         flexDirection: 'column',
         gap: 10,
         padding: '14px 16px',
-        border: isAddon ? '1.5px solid #c7d2fe' : '1px solid var(--border)',
+        border: isExtension ? '1.5px solid #fcd34d' : (isAddon ? '1.5px solid #c7d2fe' : '1px solid var(--border)'),
         boxShadow: 'var(--shadow-xs)'
       }}
     >
@@ -53,13 +60,15 @@ export default function LogsheetListItem({ logsheet }) {
           width: 44,
           height: 44,
           borderRadius: 12,
-          background: isAddon ? '#eff6ff' : 'var(--primary-subtle)',
+          background: isExtension ? '#fef3c7' : (isAddon ? '#eff6ff' : 'var(--primary-subtle)'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0
         }}>
-          {isAddon ? (
+          {isExtension ? (
+            <span style={{ fontSize: 22 }} role="img" aria-label="Extension">⏳</span>
+          ) : isAddon ? (
             <Package size={22} color="#2563eb" />
           ) : (
             <FileText size={22} color="var(--primary)" />
@@ -111,13 +120,13 @@ export default function LogsheetListItem({ logsheet }) {
               fontWeight: 700,
               padding: '2px 8px',
               borderRadius: 6,
-              background: isAddon ? '#e0e7ff' : '#ecfdf5',
-              color: isAddon ? '#3730a3' : '#065f46',
+              background: isExtension ? '#fef3c7' : (isAddon ? '#e0e7ff' : '#ecfdf5'),
+              color: isExtension ? '#b45309' : (isAddon ? '#3730a3' : '#065f46'),
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4
             }}>
-              {isAddon ? '📦 Product Add-on' : '📋 Application'}
+              {isExtension ? `⏳ Extension${logsheet.extension_days ? ` (${logsheet.extension_days}d)` : ''}` : (isAddon ? '📦 Product Add-on' : '📋 Application')}
             </span>
             <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>&middot; {date}</span>
           </div>
@@ -165,7 +174,7 @@ export default function LogsheetListItem({ logsheet }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 5 }}>
             <PenTool size={12} color="var(--primary)" />
-            Signatures Signed ({signedSignatures.length}/4)
+            Signatures Signed ({signedSignatures.length}/{requiredSigCount})
           </span>
         </div>
 

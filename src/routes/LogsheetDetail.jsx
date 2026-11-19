@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge';
-import { getLogsheetById, getApplicationById, getAddOnById, signLogsheet } from '../api/logsheets';
+import { getLogsheetById, getApplicationById, getAddOnById, signLogsheet, isExtensionLogsheet } from '../api/logsheets';
 import { API_BASE, getFileUrl } from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import {
@@ -67,19 +67,21 @@ export default function LogsheetDetail() {
     }
   }, []);
 
-  // 1. Fetch Logsheet if not in state
+  // 1. Fetch Logsheet
   useEffect(() => {
-    if (!logsheet && id) {
-      setLoadingLogsheet(true);
-      getLogsheetById(id)
+    if (id) {
+      if (!logsheet) setLoadingLogsheet(true);
+      getLogsheetById(id, state?.logsheet)
         .then(res => {
-          const ls = res.data || res;
-          setLogsheet(ls);
+          const ls = res?.data || res;
+          if (ls && (ls._id || ls.id)) {
+            setLogsheet(ls);
+          }
         })
         .catch(err => console.error('Failed to load logsheet', err))
         .finally(() => setLoadingLogsheet(false));
     }
-  }, [id, logsheet]);
+  }, [id]);
 
   // 2. Fetch associated Application or AddOn Application details
   useEffect(() => {
@@ -159,11 +161,22 @@ export default function LogsheetDetail() {
     );
   }
 
-  const isCompleted = logsheet.status?.includes('Waiting For Certificate') || logsheet.status?.includes('Completed');
-  const totalSigned = [logsheet.mufti_signature, logsheet.mufti2_signature, logsheet.manager_signature, logsheet.ceo_signature].filter(Boolean).length;
+  const isExtension = isExtensionLogsheet(logsheet);
+  const isSingleSig = isExtension && (logsheet.signatures_required === 1 || logsheet.extension_duration_type === '30_days');
+  const requiredSigs = isSingleSig ? 1 : 4;
+
+  const isCompleted =
+    logsheet.status?.includes('Waiting For Certificate') ||
+    logsheet.status?.includes('Completed') ||
+    (isExtension && ['Signed', 'Done', 'done', 'Approved'].includes(logsheet.status));
+
+  const totalSigned = isSingleSig
+    ? (logsheet.single_signature ? 1 : 0)
+    : [logsheet.mufti_signature, logsheet.mufti2_signature, logsheet.manager_signature, logsheet.ceo_signature].filter(Boolean).length;
 
   const isRoleSigned = (roleVal) => {
     if (!logsheet) return false;
+    if (isSingleSig) return Boolean(logsheet.single_signature);
     if (roleVal === 'mufti') return Boolean(logsheet.mufti_signature);
     if (roleVal === 'mufti2') return Boolean(logsheet.mufti2_signature);
     if (roleVal === 'manager') return Boolean(logsheet.manager_signature);
@@ -174,14 +187,14 @@ export default function LogsheetDetail() {
   const activeSig = mySignature || mySig;
 
   const openSignModal = () => {
-    if (isRoleSigned(selectedRole)) {
+    if (!isSingleSig && isRoleSigned(selectedRole)) {
       const firstUnsigned = ROLES.find(r => !isRoleSigned(r.value));
       if (firstUnsigned) setSelectedRole(firstUnsigned.value);
     }
     if (!activeSig && user) {
       refreshSignature(user);
     }
-    setSignComment(logsheet?.comment || '');
+    setSignComment(logsheet?.comment || logsheet?.comments || '');
     setShowSignModal(true);
   };
 
@@ -191,16 +204,16 @@ export default function LogsheetDetail() {
       return;
     }
     if (isRoleSigned(selectedRole)) {
-      showToast(`This role (${selectedRole}) has already been signed.`, 'error');
+      showToast(isSingleSig ? 'This extension logsheet has already been signed.' : `This role (${selectedRole}) has already been signed.`, 'error');
       return;
     }
     setSubmitting(true);
     try {
       const signerName = activeSig.name || user?.full_name || user?.username || 'Authorized Signatory';
-      const res = await signLogsheet(logsheet._id || logsheet.id, selectedRole, activeSig.signature_url, signerName, signComment.trim());
+      const res = await signLogsheet(logsheet._id || logsheet.id, selectedRole, activeSig.signature_url, signerName, signComment.trim(), logsheet);
       const updated = res?.data || res;
       if (updated && updated._id) {
-        setLogsheet(updated);
+        setLogsheet(prev => ({ ...prev, ...updated, comment: updated.comments || updated.comment || prev?.comment }));
       } else {
         setLogsheet(prev => ({ ...prev, comment: signComment.trim() || prev?.comment }));
       }
@@ -451,9 +464,26 @@ export default function LogsheetDetail() {
                 {logsheet.company_name || appDetails?.client_id?.company_name || 'Applicant Company'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
-                  {logsheet.audit_type || (isAddon ? 'Add-on Application' : 'Halal Audit')}
-                </span>
+                {isExtension ? (
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#b45309',
+                    background: '#fef3c7',
+                    border: '1px solid #fcd34d',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}>
+                    ⏳ Extension Logsheet{logsheet.extension_days ? ` (${logsheet.extension_days} days)` : ''}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                    {logsheet.audit_type || (isAddon ? 'Add-on Application' : 'Halal Audit')}
+                  </span>
+                )}
                 {refNumber && refNumber !== '—' && (
                   <>
                     <span style={{ color: 'var(--text-3)', fontSize: 12 }}>•</span>
@@ -480,13 +510,35 @@ export default function LogsheetDetail() {
           <div style={{ marginTop: 12, background: 'var(--primary-subtle)', borderRadius: 10, padding: '10px 12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>Committee Signatures</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>{totalSigned}/4</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>{totalSigned}/{requiredSigs}</span>
             </div>
             <div style={{ height: 4, background: 'var(--primary-border)', borderRadius: 99 }}>
-              <div style={{ height: '100%', width: `${(totalSigned / 4) * 100}%`, background: 'var(--primary)', borderRadius: 99, transition: 'width 0.4s ease' }} />
+              <div style={{ height: '100%', width: `${(totalSigned / requiredSigs) * 100}%`, background: 'var(--primary)', borderRadius: 99, transition: 'width 0.4s ease' }} />
             </div>
           </div>
         </div>
+
+        {/* Extension Details Card (for Extension Logsheets) */}
+        {isExtension && (
+          <>
+            <p className="section-heading">⏳ Extension Details</p>
+            <div className="card" style={{ padding: '4px 16px', border: '1px solid #fcd34d' }}>
+              {[
+                { label: 'Duration Type', value: isSingleSig ? '30 Days (1 Signature Required)' : 'More than 30 Days (4 Signatures Required)' },
+                { label: 'Extension Period', value: logsheet.extension_days ? `${logsheet.extension_days} Days` : '—' },
+                { label: 'Existing Certificate No.', value: logsheet.existing_certificate_number || logsheet.extension_app?.certificate_id?.certificate_number || '—' },
+                { label: 'Certificate Expiry Date', value: formatDate(logsheet.certificate_expiry_date || logsheet.extended_expiry_date) || '—' },
+                { label: 'Scheme', value: logsheet.scheme || logsheet.recommended_scheme || 'HFA' },
+                { label: 'Justification / Reason', value: logsheet.justification || logsheet.extension_reason || '—' },
+              ].map(({ label, value }) => (
+                <div key={label} className="detail-row" style={{ padding: '8px 0', borderBottom: '1px solid var(--divider)' }}>
+                  <div className="detail-label" style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>{label}</div>
+                  <div className="detail-value" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', textAlign: 'right', maxWidth: '60%', wordBreak: 'break-word' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Company & Site Details */}
         <p className="section-heading">Company & Site Details</p>
@@ -812,12 +864,15 @@ export default function LogsheetDetail() {
         {/* Signature Status */}
         <p className="section-heading" style={{ marginTop: 16 }}>Signature Status</p>
         <div className="sig-grid">
-          {[
-            { label: 'Mufti 1', name: logsheet.mufti_sign_name },
-            { label: 'Mufti 2', name: logsheet.mufti2_sign_name },
-            { label: 'Manager', name: logsheet.manager_sign_name },
-            { label: 'CEO', name: logsheet.ceo_sign_name },
-          ].map(({ label, name }) => (
+          {(isSingleSig
+            ? [{ label: logsheet.single_sign_role || 'Authorized Officer', name: logsheet.single_sign_name }]
+            : [
+                { label: 'Mufti 1', name: logsheet.mufti_sign_name },
+                { label: 'Mufti 2', name: logsheet.mufti2_sign_name },
+                { label: 'Manager', name: logsheet.manager_sign_name },
+                { label: 'CEO', name: logsheet.ceo_sign_name },
+              ]
+          ).map(({ label, name }) => (
             <div key={label} className="sig-cell">
               <div className="sig-cell-dot" style={{ background: name ? 'var(--status-done-text)' : 'var(--text-3)' }} />
               <div>
@@ -829,7 +884,7 @@ export default function LogsheetDetail() {
         </div>
 
         {/* Action */}
-        {!isCompleted && (
+        {!isCompleted && totalSigned < requiredSigs && (
           <button className="btn btn-primary" onClick={openSignModal} style={{ marginTop: 16, borderRadius: 14, padding: 14 }}>
             <PenLine size={18} /> Sign Logsheet
           </button>
